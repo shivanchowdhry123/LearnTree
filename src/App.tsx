@@ -10,6 +10,12 @@ import {
   RefreshCw,
   FolderTree,
   SlidersHorizontal,
+  Clock,
+  CheckSquare,
+  MinusSquare,
+  Sparkles,
+  Users,
+  UserCheck,
 } from 'lucide-react';
 import type {
   SyllabusNode,
@@ -17,6 +23,20 @@ import type {
   DashboardMetrics,
   ReviewRating,
 } from './types/syllabus';
+import type { UserProfile } from './types/user';
+import {
+  loadUserProfiles,
+  getActiveUserId,
+  setActiveUserId,
+  loadUserSyllabus,
+  saveUserSyllabus,
+  loadUserStreak,
+  saveUserStreak,
+  loadUserLastStudyDate,
+  saveUserLastStudyDate,
+  createUserProfile,
+  INITIAL_USER_PROFILES,
+} from './lib/userStore';
 import { parseSyllabusText, flattenTree, exportToMarkdown } from './lib/parser';
 import { calculateNextReview, createInitialSM2State } from './lib/sm2';
 import { DashboardHeader } from './components/DashboardHeader';
@@ -24,113 +44,81 @@ import { SyllabusTreeView } from './components/SyllabusTreeView';
 import { MarkdownImportModal } from './components/MarkdownImportModal';
 import { ReviewDrawer } from './components/ReviewDrawer';
 
-const LOCAL_STORAGE_KEY_NODES = 'learntree_nodes';
-const LOCAL_STORAGE_KEY_STREAK = 'learntree_streak';
-const LOCAL_STORAGE_KEY_LAST_DATE = 'learntree_last_study_date';
-
-const DEFAULT_STARTER_SYLLABUS = `# Full-Stack Systems & Distributed Engineering
-- [x] [TypeScript Type Systems & Generics](https://www.typescriptlang.org/docs/) #typescript #types
-  - [x] Discriminated Unions & Exhaustiveness Checking #types
-  - [ ] Conditional Types & Type Inference with \`infer\` #advanced
-- [x] [React 19 Architecture & Compiler](https://react.dev/) #react #frontend
-  - [x] Server Components & Streaming Protocol #react19
-  - [ ] Concurrent Transitions (\`useTransition\`, \`useDeferredValue\`) #performance
-  - [ ] Optimistic Updates (\`useOptimistic\`) #ux
-- Local-First Architecture & Sync #architecture
-  - [ ] Conflict-Free Replicated Data Types (CRDTs) #localfirst
-  - [ ] Offline Storage & IndexedDB Synchronization #storage
-- High-Performance Networking & Protocols #backend
-  - [x] [HTTP/3 & QUIC Transport](https://http3-explained.haxx.se/) #networking
-  - [ ] gRPC & Protocol Buffers Invariants #rpc
-  - [ ] Server-Sent Events (SSE) vs WebSockets #realtime
-- Memory Management & Virtual Machines #systems
-  - [ ] WebAssembly Runtime & SIMD Acceleration #wasm
-  - [ ] V8 Hidden Classes & Garbage Collection Cycles #v8`;
-
-function seedDefaultNodes(): SyllabusNode[] {
-  const nodes = parseSyllabusText(DEFAULT_STARTER_SYLLABUS);
-  const now = new Date();
-  
-  // Set 2 mastered items to be due for review today so user can immediately test Review Queue
-  if (nodes.length > 0 && nodes[0].children.length > 0) {
-    const dueTime = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
-    nodes[0].sm2State = {
-      interval: 1,
-      repetition: 1,
-      easeFactor: 2.5,
-      lastReviewedAt: new Date(now.getTime() - 26 * 60 * 60 * 1000).toISOString(),
-      nextReviewAt: dueTime,
-    };
-    nodes[0].children[0].sm2State = {
-      interval: 1,
-      repetition: 1,
-      easeFactor: 2.4,
-      lastReviewedAt: new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString(),
-      nextReviewAt: dueTime,
-    };
-  }
-  return nodes;
-}
-
 export default function App() {
-  const [nodes, setNodes] = useState<SyllabusNode[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY_NODES);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load cached nodes:', err);
-      }
-    }
-    return seedDefaultNodes();
-  });
+  // Multi-user state
+  const [users, setUsers] = useState<UserProfile[]>(() => loadUserProfiles());
+  const [activeUserId, setActiveUserIdState] = useState<string>(() => getActiveUserId());
 
-  const [streakDays, setStreakDays] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(LOCAL_STORAGE_KEY_STREAK);
-        if (cached) {
-          return parseInt(cached, 10) || 3;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return 3;
-  });
+  const activeUser = useMemo(() => {
+    return (
+      users.find((u) => u.id === activeUserId) ||
+      users[0] ||
+      INITIAL_USER_PROFILES[0]
+    );
+  }, [users, activeUserId]);
 
+  // Per-user syllabus state
+  const [nodes, setNodes] = useState<SyllabusNode[]>(() =>
+    loadUserSyllabus(activeUserId)
+  );
+
+  // Per-user active recall streak
+  const [streakDays, setStreakDays] = useState<number>(() =>
+    loadUserStreak(activeUserId)
+  );
+
+  // Modal & Drawer visibility
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
+
+  // Search & Filtering state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'in_progress' | 'mastered'>('all');
   const [copiedMarkdown, setCopiedMarkdown] = useState<boolean>(false);
 
-  // Synchronize nodes to LocalStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_NODES, JSON.stringify(nodes));
-    } catch (err) {
-      console.error('Failed to persist nodes:', err);
-    }
-  }, [nodes]);
+  // Switch Active User Profile Handler
+  const handleSwitchUser = useCallback((newUserId: string) => {
+    setActiveUserIdState(newUserId);
+    setActiveUserId(newUserId);
+    // Load that user's dedicated syllabus and streak
+    const userNodes = loadUserSyllabus(newUserId);
+    const userStreak = loadUserStreak(newUserId);
+    setNodes(userNodes);
+    setStreakDays(userStreak);
+    setSearchQuery('');
+    setSelectedTag(null);
+    setStatusFilter('all');
+  }, []);
 
-  // Synchronize streak to LocalStorage
+  // Create New Student Profile Handler
+  const handleCreateUser = useCallback(
+    (name: string, focusArea: string, color: string) => {
+      const newProfile = createUserProfile(name, focusArea, color);
+      const updatedList = loadUserProfiles();
+      setUsers(updatedList);
+      handleSwitchUser(newProfile.id);
+    },
+    [handleSwitchUser]
+  );
+
+  // Persist current user's syllabus when nodes state changes
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_STREAK, streakDays.toString());
-    } catch {
-      // ignore
+    if (activeUserId) {
+      saveUserSyllabus(activeUserId, nodes);
     }
-  }, [streakDays]);
+  }, [activeUserId, nodes]);
+
+  // Persist current user's streak when streak changes
+  useEffect(() => {
+    if (activeUserId) {
+      saveUserStreak(activeUserId, streakDays);
+    }
+  }, [activeUserId, streakDays]);
 
   const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
 
-  // Determine which nodes are due for review
+  // Nodes due for review for active user
   const dueNodes = useMemo(() => {
     const nowTime = Date.now();
     return flatNodes.filter((node) => {
@@ -138,19 +126,17 @@ export default function App() {
         const nextTime = new Date(node.sm2State.nextReviewAt).getTime();
         return nextTime <= nowTime;
       }
-      // If node is in_progress or mastered without scheduled date, queue for review
       return node.status !== 'unstarted';
     });
   }, [flatNodes]);
 
-  // Compute DashboardMetrics dynamically
+  // Compute DashboardMetrics dynamically for active user
   const metrics = useMemo<DashboardMetrics>(() => {
     const totalNodes = flatNodes.length;
     const completedNodes = flatNodes.filter((n) => n.status === 'mastered').length;
     const dueForReviewCount = dueNodes.length;
 
-    // Calculate retention rate based on average ease factor and successful repetitions
-    let retentionRate = 0.85; // baseline
+    let retentionRate = 0.85;
     if (totalNodes > 0) {
       const matureNodes = flatNodes.filter((n) => n.sm2State.repetition >= 2).length;
       retentionRate = Math.min(
@@ -168,7 +154,7 @@ export default function App() {
     };
   }, [flatNodes, dueNodes.length, streakDays]);
 
-  // Extract all unique tags
+  // Extract all unique tags in active user's syllabus
   const allTags = useMemo(() => {
     const tagsSet = new Set<string>();
     for (const node of flatNodes) {
@@ -181,10 +167,10 @@ export default function App() {
     return Array.from(tagsSet);
   }, [flatNodes]);
 
-  // Update study streak on review completion
+  // Study activity streak update for active user
   const recordStudyActivity = useCallback(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const lastDate = localStorage.getItem(LOCAL_STORAGE_KEY_LAST_DATE);
+    const lastDate = loadUserLastStudyDate(activeUserId);
 
     if (lastDate !== todayStr) {
       const yesterday = new Date();
@@ -196,11 +182,11 @@ export default function App() {
       } else if (!lastDate) {
         setStreakDays(1);
       }
-      localStorage.setItem(LOCAL_STORAGE_KEY_LAST_DATE, todayStr);
+      saveUserLastStudyDate(activeUserId, todayStr);
     }
-  }, []);
+  }, [activeUserId]);
 
-  // Recursive tree updater helper
+  // Recursive tree updater
   const updateNodeInTree = useCallback(
     (
       tree: SyllabusNode[],
@@ -223,14 +209,13 @@ export default function App() {
     []
   );
 
-  // Status Change Handler
+  // Per-user Status Change Handler
   const handleNodeStatusChange = useCallback(
     (id: string, newStatus: SyllabusNodeStatus) => {
       setNodes((prev) =>
         updateNodeInTree(prev, id, (node) => {
           let updatedSM2 = node.sm2State;
           if (newStatus === 'mastered' && !node.sm2State.nextReviewAt) {
-            // First time mastered: schedule initial review tomorrow
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             updatedSM2 = {
@@ -252,7 +237,7 @@ export default function App() {
     [updateNodeInTree]
   );
 
-  // SM-2 Review Rating Handler
+  // Per-user SM-2 Review Rating Handler
   const handleRateNode = useCallback(
     (nodeId: string, rating: ReviewRating) => {
       setNodes((prev) =>
@@ -273,17 +258,13 @@ export default function App() {
     [updateNodeInTree, recordStudyActivity]
   );
 
-  // Import Handler
+  // Per-user Import Handler
   const handleImportSyllabus = useCallback((importedNodes: SyllabusNode[]) => {
     setNodes(importedNodes);
   }, []);
 
-  // Filter tree based on search query or selected tag
+  // Filter nodes based on search, tag, and status
   const filteredNodes = useMemo(() => {
-    if (!searchQuery && !selectedTag) {
-      return nodes;
-    }
-
     const query = searchQuery.toLowerCase().trim();
 
     function filterBranch(list: SyllabusNode[]): SyllabusNode[] {
@@ -291,9 +272,23 @@ export default function App() {
       for (const item of list) {
         const matchesQuery = !query || item.title.toLowerCase().includes(query);
         const matchesTag = !selectedTag || (item.tags && item.tags.includes(selectedTag));
+
+        let matchesStatus = true;
+        if (statusFilter === 'mastered') {
+          matchesStatus = item.status === 'mastered';
+        } else if (statusFilter === 'in_progress') {
+          matchesStatus = item.status === 'in_progress';
+        } else if (statusFilter === 'due') {
+          const isDue =
+            (item.sm2State.nextReviewAt &&
+              new Date(item.sm2State.nextReviewAt).getTime() <= Date.now()) ||
+            item.status !== 'unstarted';
+          matchesStatus = Boolean(isDue);
+        }
+
         const filteredChildren = item.children ? filterBranch(item.children) : [];
 
-        if ((matchesQuery && matchesTag) || filteredChildren.length > 0) {
+        if ((matchesQuery && matchesTag && matchesStatus) || filteredChildren.length > 0) {
           results.push({
             ...item,
             children: filteredChildren,
@@ -303,10 +298,13 @@ export default function App() {
       return results;
     }
 
-    return filterBranch(nodes);
-  }, [nodes, searchQuery, selectedTag]);
+    if (!query && !selectedTag && statusFilter === 'all') {
+      return nodes;
+    }
 
-  // Export current syllabus to clipboard as Markdown
+    return filterBranch(nodes);
+  }, [nodes, searchQuery, selectedTag, statusFilter]);
+
   const handleCopyMarkdown = () => {
     const md = exportToMarkdown(nodes);
     navigator.clipboard.writeText(md);
@@ -314,60 +312,130 @@ export default function App() {
     setTimeout(() => setCopiedMarkdown(false), 2000);
   };
 
-  // Reset to default sample
-  const handleResetSample = () => {
-    if (confirm('Reset to default syllabus template? This will replace current nodes.')) {
-      setNodes(seedDefaultNodes());
+  const handleResetCurrentSyllabus = () => {
+    if (confirm(`Reset syllabus for ${activeUser.name}? This will restore the user's initial curriculum.`)) {
+      localStorage.removeItem(`learntree_user_${activeUserId}_nodes`);
+      const freshNodes = loadUserSyllabus(activeUserId);
+      setNodes(freshNodes);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-[#f1f5f9] selection:bg-[#06b6d4]/30 selection:text-[#f1f5f9] font-sans antialiased">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Dashboard Header with Brand, $0-AI Local-First pill, Actions, and KPI Cards */}
+        {/* Dashboard Header with Multi-User Profile Switcher, Badges & KPI Tiles */}
         <DashboardHeader
           metrics={metrics}
           onOpenImport={() => setIsImportOpen(true)}
           onOpenReview={() => setIsReviewOpen(true)}
+          users={users}
+          activeUser={activeUser}
+          onSwitchUser={handleSwitchUser}
+          onCreateUser={handleCreateUser}
         />
 
-        {/* Filter, Search & Export Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded bg-[#12141c] border border-[#2d3246]">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
+        {/* Current Student Active Profile Context Ribbon */}
+        <div className="flex items-center justify-between px-4 py-2 rounded-md bg-[#141722] border border-[#2a3045] text-xs font-mono text-[#94a3b8]">
+          <div className="flex items-center gap-2">
+            <span
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: activeUser.avatarColor }}
+            />
+            <span className="text-[#f1f5f9] font-medium">{activeUser.name}</span>
+            <span className="text-[#475569]">·</span>
+            <span className="text-[#c0c1ff]">{activeUser.focusArea}</span>
+          </div>
+          <span className="text-[11px] text-[#10b981] hidden sm:inline">
+            Isolated Local-First Database
+          </span>
+        </div>
+
+        {/* Filter, Search & Action Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-3.5 rounded-lg bg-[#141722] border border-[#2a3045] shadow-sm">
+          {/* Search Field & Tag Trigger */}
+          <div className="flex items-center gap-2.5 flex-1 max-w-lg">
             <div className="relative w-full">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter concepts or topics..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#1a1d28] border border-[#2d3246] focus:border-[#06b6d4] focus:outline-none rounded text-[#f1f5f9] placeholder-[#475569] font-sans transition-colors"
+                placeholder={`Search ${activeUser.name}'s concepts...`}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#1b1f2e] border border-[#2a3045] focus:border-[#06b6d4] focus:outline-none rounded-md text-[#f1f5f9] placeholder-[#475569] font-sans transition-all"
               />
             </div>
             {selectedTag && (
               <button
                 type="button"
                 onClick={() => setSelectedTag(null)}
-                className="px-2 py-1 text-[11px] font-mono rounded bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/30 hover:bg-[#06b6d4]/20 transition-colors shrink-0"
+                className="px-2.5 py-1 text-[11px] font-mono rounded-md bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/30 hover:bg-[#06b6d4]/20 transition-colors shrink-0 cursor-pointer"
               >
                 #{selectedTag} ✕
               </button>
             )}
           </div>
 
+          {/* Status Quick Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-[#1b1f2e] text-[#f1f5f9] border-[#06b6d4] font-semibold'
+                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
+              }`}
+            >
+              All ({flatNodes.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('due')}
+              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
+                statusFilter === 'due'
+                  ? 'bg-[#f59e0b]/20 text-[#f59e0b] border-[#f59e0b] font-semibold'
+                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
+              }`}
+            >
+              Due ({dueNodes.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('in_progress')}
+              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
+                statusFilter === 'in_progress'
+                  ? 'bg-[#06b6d4]/20 text-[#06b6d4] border-[#06b6d4] font-semibold'
+                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
+              }`}
+            >
+              In Progress
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('mastered')}
+              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
+                statusFilter === 'mastered'
+                  ? 'bg-[#10b981]/20 text-[#10b981] border-[#10b981] font-semibold'
+                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
+              }`}
+            >
+              Mastered
+            </button>
+          </div>
+
           {/* Quick Actions & Export */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end lg:self-auto">
             {allTags.length > 0 && (
-              <div className="hidden md:flex items-center gap-1.5 overflow-x-auto max-w-xs py-0.5">
-                {allTags.slice(0, 4).map((t) => (
+              <div className="hidden xl:flex items-center gap-1.5 overflow-x-auto max-w-xs py-0.5">
+                {allTags.slice(0, 3).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                       selectedTag === t
                         ? 'bg-[#06b6d4] text-[#090a0f] border-[#06b6d4] font-semibold'
-                        : 'bg-[#1a1d28] text-[#94a3b8] border-[#2d3246] hover:text-[#f1f5f9]'
+                        : 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
                     }`}
                   >
                     #{t}
@@ -379,8 +447,8 @@ export default function App() {
             <button
               type="button"
               onClick={handleCopyMarkdown}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded bg-[#1a1d28] hover:bg-[#262a3b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2d3246] transition-colors cursor-pointer"
-              title="Copy syllabus as Markdown checklist"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium rounded-md bg-[#1b1f2e] hover:bg-[#23283b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2a3045] transition-colors cursor-pointer"
+              title="Copy active syllabus as Markdown checklist"
             >
               {copiedMarkdown ? (
                 <>
@@ -397,16 +465,16 @@ export default function App() {
 
             <button
               type="button"
-              onClick={handleResetSample}
-              className="p-1.5 rounded text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#262a3b] border border-[#2d3246] transition-colors cursor-pointer"
-              title="Reset to default sample"
+              onClick={handleResetCurrentSyllabus}
+              className="p-1.5 rounded-md text-[#94a3b8] hover:text-[#f1f5f9] bg-[#1b1f2e] hover:bg-[#23283b] border border-[#2a3045] transition-colors cursor-pointer"
+              title="Reset current student's syllabus to starter defaults"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Main Syllabus Hierarchy View */}
+        {/* Main Tree Hierarchy */}
         <main>
           <SyllabusTreeView
             nodes={filteredNodes}
@@ -415,14 +483,14 @@ export default function App() {
         </main>
       </div>
 
-      {/* Markdown Import Split-Pane Modal */}
+      {/* Split-Pane Markdown Import Modal */}
       <MarkdownImportModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onImport={handleImportSyllabus}
       />
 
-      {/* Active Recall SM-2 Review Drawer */}
+      {/* Active Recall Review Drawer */}
       <ReviewDrawer
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}

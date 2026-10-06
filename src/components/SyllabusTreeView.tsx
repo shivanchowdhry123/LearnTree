@@ -29,7 +29,7 @@ function formatSM2Badge(sm2State: SM2State): { label: string; style: string } {
   if (!sm2State.nextReviewAt) {
     return {
       label: 'New',
-      style: 'bg-[#1a1d28] text-[#94a3b8] border-[#2d3246]',
+      style: 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045]',
     };
   }
 
@@ -45,17 +45,18 @@ function formatSM2Badge(sm2State: SM2State): { label: string; style: string } {
   if (diffDays <= 0) {
     return {
       label: 'Due Today',
-      style: 'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30 shadow-[0_0_8px_rgba(245,158,11,0.15)] font-semibold',
+      style:
+        'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/40 shadow-[0_0_8px_rgba(245,158,11,0.2)] font-semibold',
     };
   } else if (diffDays === 1) {
     return {
       label: 'In 1d',
-      style: 'bg-[#6366f1]/10 text-[#c0c1ff] border-[#6366f1]/30',
+      style: 'bg-[#6366f1]/15 text-[#c0c1ff] border-[#6366f1]/30',
     };
   } else {
     return {
       label: `In ${diffDays}d`,
-      style: 'bg-[#1a1d28] text-[#94a3b8] border-[#2d3246]',
+      style: 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045]',
     };
   }
 }
@@ -91,16 +92,16 @@ const NodeRow: React.FC<NodeRowProps> = ({
   return (
     <div
       onClick={handleRowClick}
-      className={`group flex items-center justify-between gap-3 px-2.5 py-1.5 rounded transition-colors cursor-pointer select-none ${
+      className={`group flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-all cursor-pointer select-none border border-transparent ${
         node.status === 'mastered'
-          ? 'hover:bg-[#12141c]/60'
+          ? 'hover:bg-[#1b1f2e]/60 hover:border-[#2a3045]'
           : node.status === 'in_progress'
-          ? 'hover:bg-[#06b6d4]/5'
-          : 'hover:bg-[#1a1d28]/70'
+          ? 'hover:bg-[#06b6d4]/5 hover:border-[#06b6d4]/30'
+          : 'hover:bg-[#1b1f2e] hover:border-[#2a3045]'
       }`}
     >
       {/* Left Column: Chevron + 3-State Checkbox + Title & URL */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {/* Expand / Collapse Chevron */}
         <div className="w-4 h-4 flex items-center justify-center shrink-0">
           {hasChildren ? (
@@ -120,11 +121,11 @@ const NodeRow: React.FC<NodeRowProps> = ({
               )}
             </button>
           ) : (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2d3246]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#2a3045]" />
           )}
         </div>
 
-        {/* 3-State Status Toggle Trigger */}
+        {/* 3-State Status Cyclical Checkbox */}
         <button
           type="button"
           onClick={handleCheckboxClick}
@@ -143,7 +144,7 @@ const NodeRow: React.FC<NodeRowProps> = ({
         {/* Node Title & Optional External URL */}
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`text-sm tracking-tight truncate font-sans ${
+            className={`text-sm tracking-tight truncate ${
               node.status === 'mastered'
                 ? 'text-[#94a3b8] line-through decoration-[#475569]'
                 : node.status === 'in_progress'
@@ -177,7 +178,7 @@ const NodeRow: React.FC<NodeRowProps> = ({
             {node.tags.map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#1a1d28] border border-[#2d3246] text-[#94a3b8]"
+                className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#1b1f2e] border border-[#2a3045] text-[#94a3b8]"
               >
                 #{tag}
               </span>
@@ -187,7 +188,7 @@ const NodeRow: React.FC<NodeRowProps> = ({
 
         {/* SM-2 Interval Status Badge */}
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border tabular-nums ${sm2Badge.style}`}
+          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border tabular-nums ${sm2Badge.style}`}
         >
           {sm2Badge.label === 'Due Today' ? (
             <Clock className="w-2.5 h-2.5 text-[#f59e0b]" />
@@ -206,12 +207,11 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
   onNodeStatusChange,
   onNodeToggleExpand,
 }) => {
-  // Local expanded tracking state if parent doesn't manage it directly
   const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(() => {
     const initialMap: Record<string, boolean> = {};
     function seed(list: SyllabusNode[]) {
       for (const item of list) {
-        initialMap[item.id] = true; // default expanded for effortless navigation
+        initialMap[item.id] = true;
         if (item.children) seed(item.children);
       }
     }
@@ -233,7 +233,11 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
     if (!items || items.length === 0) return null;
 
     return (
-      <div className={`space-y-0.5 ${depth > 0 ? 'ml-4 pl-2.5 border-l border-[#1e2230]' : ''}`}>
+      <div
+        className={`space-y-1 ${
+          depth > 0 ? 'ml-4 pl-3 border-l border-[#2a3045]' : ''
+        }`}
+      >
         {items.map((node) => {
           const isExpanded = internalExpanded[node.id] ?? true;
           const hasChildren = node.children && node.children.length > 0;
@@ -261,23 +265,23 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
 
   if (!nodes || nodes.length === 0) {
     return (
-      <div className="p-12 text-center rounded border border-[#2d3246] bg-[#12141c]">
-        <p className="text-sm text-[#94a3b8]">No syllabus nodes found.</p>
-        <p className="text-xs text-[#475569] mt-1">
-          Import a Markdown syllabus or paste indented bullet points to populate the tree.
+      <div className="p-12 text-center rounded-lg border border-[#2a3045] bg-[#141722]">
+        <p className="text-sm text-[#94a3b8] font-mono">No syllabus nodes found.</p>
+        <p className="text-xs text-[#475569] mt-1 font-mono">
+          Import a Markdown outline or indented notes to populate your knowledge tree.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="w-full rounded bg-[#12141c] border border-[#2d3246] p-3 sm:p-4 shadow-sm">
-      <div className="flex items-center justify-between pb-3 mb-2 border-b border-[#1e2230] text-xs text-[#94a3b8]">
-        <span className="font-mono uppercase tracking-wider text-[11px] text-[#4edea3]">
-          Curriculum Hierarchy
+    <div className="w-full rounded-lg bg-[#141722] border border-[#2a3045] p-4 sm:p-5 shadow-sm">
+      <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-[#2a3045] text-xs text-[#94a3b8]">
+        <span className="font-mono uppercase tracking-wider text-[11px] text-[#10b981] font-semibold">
+          Curriculum Hierarchy & Nodes
         </span>
-        <span className="text-[11px] font-mono">
-          Click checkbox to cycle state · Click row to toggle
+        <span className="text-[11px] font-mono text-[#94a3b8] hidden sm:inline">
+          3-state checkbox: Unstarted → In Progress → Mastered
         </span>
       </div>
       {renderRecursiveTree(nodes, 0)}

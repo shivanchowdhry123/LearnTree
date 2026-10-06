@@ -10,6 +10,8 @@ import {
   FileText,
   Sparkles,
   ExternalLink,
+  Layers,
+  Terminal,
 } from 'lucide-react';
 import type { SyllabusNode } from '../types/syllabus';
 import { parseSyllabusText, flattenTree } from '../lib/parser';
@@ -43,7 +45,9 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
   onImport,
   initialText = '',
 }) => {
-  const [inputText, setInputText] = useState<string>(initialText || DEFAULT_SAMPLE_SYLLABUS);
+  const [inputText, setInputText] = useState<string>(
+    initialText || DEFAULT_SAMPLE_SYLLABUS
+  );
 
   useEffect(() => {
     if (initialText) {
@@ -51,7 +55,6 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
     }
   }, [initialText]);
 
-  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -62,7 +65,7 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Real-time parsing with parseSyllabusText
+  // Real-time AST parsing
   const parsedNodes = useMemo(() => {
     return parseSyllabusText(inputText);
   }, [inputText]);
@@ -80,6 +83,8 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
     return flatNodes.filter((n) => n.status === 'mastered').length;
   }, [flatNodes]);
 
+  const unstartedCount = flatNodes.length - completedCount;
+
   if (!isOpen) return null;
 
   const handleImportClick = () => {
@@ -92,40 +97,51 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
     setInputText(DEFAULT_SAMPLE_SYLLABUS);
   };
 
-  const renderPreviewItem = (node: SyllabusNode) => {
+  const renderASTPreviewItem = (node: SyllabusNode) => {
     return (
       <div key={node.id} className="relative">
         <div
-          className="flex items-center gap-2 py-1 text-xs select-none"
-          style={{ paddingLeft: `${node.depth * 16}px` }}
+          className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[#1b1f2e] text-xs font-mono select-none transition-colors"
+          style={{ paddingLeft: `${node.depth * 18 + 8}px` }}
         >
+          {/* Depth AST Badge in Indigo */}
+          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#6366f1]/15 text-[#c0c1ff] border border-[#6366f1]/30 shrink-0">
+            L{node.depth}
+          </span>
+
+          {/* Status Indicator */}
           <span
             className={`w-2.5 h-2.5 rounded-xs shrink-0 border ${
               node.status === 'mastered'
                 ? 'bg-[#10b981] border-[#10b981]'
-                : 'bg-[#1a1d28] border-[#2d3246]'
+                : 'bg-[#141722] border-[#2a3045]'
             }`}
           />
+
+          {/* Title */}
           <span
-            className={`truncate font-sans ${
+            className={`truncate font-sans text-xs ${
               node.status === 'mastered'
-                ? 'text-[#94a3b8] line-through'
+                ? 'text-[#94a3b8] line-through decoration-[#475569]'
                 : 'text-[#f1f5f9]'
             }`}
           >
             {node.title}
           </span>
+
           {node.url && (
-            <span className="text-[#06b6d4] inline-flex items-center">
+            <span className="text-[#06b6d4] inline-flex items-center shrink-0">
               <ExternalLink className="w-2.5 h-2.5" />
             </span>
           )}
+
+          {/* Tags */}
           {node.tags && node.tags.length > 0 && (
             <div className="flex items-center gap-1 shrink-0 ml-auto pl-2">
               {node.tags.map((t) => (
                 <span
                   key={t}
-                  className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#1a1d28] text-[#94a3b8] border border-[#2d3246]"
+                  className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#1b1f2e] text-[#94a3b8] border border-[#2a3045]"
                 >
                   #{t}
                 </span>
@@ -133,35 +149,38 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
             </div>
           )}
         </div>
+
         {node.children && node.children.length > 0 && (
-          <div>
-            {node.children.map((child) => renderPreviewItem(child))}
-          </div>
+          <div>{node.children.map((child) => renderASTPreviewItem(child))}</div>
         )}
       </div>
     );
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#090a0f]/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#12141c] border border-[#2d3246] rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#090a0f]/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#141722] border border-[#2a3045] rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.85)] overflow-hidden">
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2d3246] bg-[#1a1d28]/60">
-          <div className="flex items-center gap-2.5">
-            <Upload className="w-4 h-4 text-[#06b6d4]" />
-            <h2 className="text-sm font-semibold text-[#f1f5f9] tracking-tight">
-              Import Syllabus
-            </h2>
-            <span className="text-xs font-mono text-[#94a3b8]">
-              Markdown & Indented Text Parser
-            </span>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2a3045] bg-[#1b1f2e]">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded bg-[#06b6d4]/10 border border-[#06b6d4]/30 flex items-center justify-center text-[#06b6d4]">
+              <Upload className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-[#f1f5f9] tracking-tight">
+                Import Syllabus Outline
+              </h2>
+              <span className="text-[11px] font-mono text-[#94a3b8]">
+                Markdown & Tabular Indentation AST Engine
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={handleLoadSample}
-              className="text-xs font-mono text-[#06b6d4] hover:text-[#4cd7f6] inline-flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-xs font-mono text-[#06b6d4] hover:text-[#4cd7f6] inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#06b6d4]/10 border border-[#06b6d4]/20 cursor-pointer transition-colors"
             >
               <Sparkles className="w-3 h-3" />
               Load Sample
@@ -169,7 +188,7 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#262a3b] transition-colors cursor-pointer"
+              className="p-1 rounded text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#23283b] transition-colors cursor-pointer"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -177,75 +196,75 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
           </div>
         </div>
 
-        {/* Split Pane: Editor (Left) & Real-time Tree Preview (Right) */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#2d3246] min-h-0">
-          {/* Left Pane: Textarea input */}
-          <div className="flex flex-col h-full bg-[#12141c]">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2230] text-[11px] font-mono text-[#94a3b8]">
-              <span className="flex items-center gap-1.5">
-                <Code2 className="w-3.5 h-3.5 text-[#6366f1]" />
-                Input (Indented / Markdown)
+        {/* Split-Pane: Editor (Left) & Real-time AST Tree Preview (Right) */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#2a3045] min-h-0 bg-[#090a0f]">
+          {/* Left Pane: Textarea Editor */}
+          <div className="flex flex-col h-full bg-[#141722]/60">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a3045] text-[11px] font-mono text-[#94a3b8] bg-[#1b1f2e]/60">
+              <span className="flex items-center gap-1.5 text-[#06b6d4]">
+                <Code2 className="w-3.5 h-3.5" />
+                Raw Indented Text / Markdown
               </span>
-              <span>Supports 2/4 spaces, tabs, [x], #tags</span>
+              <span>2/4 spaces or tabs · [x] · #tags</span>
             </div>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="- [ ] Topic Title #tag&#10;  - [x] Subtopic [Reference](https://...)&#10;    - Detail item"
-              className="flex-1 w-full p-4 bg-[#090a0f] text-[#f1f5f9] font-mono text-xs leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-[#06b6d4] border-0"
+              className="flex-1 w-full p-4 bg-[#090a0f] text-[#f1f5f9] font-mono text-xs leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-[#06b6d4] border-0 placeholder-[#475569]"
               spellCheck={false}
               autoFocus
             />
           </div>
 
-          {/* Right Pane: Real-time Live Tree Preview */}
-          <div className="flex flex-col h-full bg-[#12141c]">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2230] text-[11px] font-mono text-[#94a3b8]">
-              <span className="flex items-center gap-1.5">
-                <ListTree className="w-3.5 h-3.5 text-[#10b981]" />
-                Live Tree Preview
+          {/* Right Pane: Real-time Live AST Tree Preview */}
+          <div className="flex flex-col h-full bg-[#141722]">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a3045] text-[11px] font-mono text-[#94a3b8] bg-[#1b1f2e]/60">
+              <span className="flex items-center gap-1.5 text-[#10b981]">
+                <ListTree className="w-3.5 h-3.5" />
+                AST Live Tree Preview
               </span>
-              <span className="text-[#4edea3] font-medium">
-                {flatNodes.length} nodes · {maxDepth + 1} levels
+              <span className="text-[#10b981] font-semibold">
+                {flatNodes.length} parsed · {maxDepth + 1} max depth
               </span>
             </div>
 
-            <div className="flex-1 p-4 overflow-y-auto space-y-0.5 bg-[#12141c]">
+            <div className="flex-1 p-4 overflow-y-auto space-y-1 bg-[#141722]">
               {parsedNodes.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[#94a3b8]">
-                  <FileText className="w-8 h-8 text-[#2d3246] mb-2" />
-                  <p className="text-xs">No valid nodes detected.</p>
-                  <p className="text-[11px] text-[#475569] mt-1">
+                  <FileText className="w-8 h-8 text-[#2a3045] mb-2" />
+                  <p className="text-xs font-mono">No valid syllabus nodes detected.</p>
+                  <p className="text-[11px] text-[#475569] font-mono mt-1">
                     Paste an outline or click &quot;Load Sample&quot; to test.
                   </p>
                 </div>
               ) : (
-                parsedNodes.map((root) => renderPreviewItem(root))
+                parsedNodes.map((root) => renderASTPreviewItem(root))
               )}
             </div>
 
-            {/* Tree Summary Bar */}
-            <div className="px-4 py-2 border-t border-[#1e2230] bg-[#1a1d28]/40 flex items-center justify-between text-[11px] font-mono text-[#94a3b8]">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3 text-[#10b981]" />
-                {completedCount} pre-marked mastered
+            {/* Node Validation Status Bar */}
+            <div className="px-4 py-2 border-t border-[#2a3045] bg-[#1b1f2e] flex items-center justify-between text-[11px] font-mono text-[#94a3b8]">
+              <span className="flex items-center gap-1.5 text-[#10b981]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {completedCount} pre-mastered · {unstartedCount} queued
               </span>
-              <span>SM-2 defaults ready</span>
+              <span className="text-[#c0c1ff]">SuperMemo-2 parameters initialized</span>
             </div>
           </div>
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[#2d3246] bg-[#1a1d28]/80">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-[#2a3045] bg-[#1b1f2e]">
           <span className="text-xs text-[#94a3b8] font-mono hidden sm:inline">
-            Press Esc to cancel
+            Press Esc to dismiss
           </span>
 
           <div className="flex items-center gap-3 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 text-xs font-medium rounded bg-[#1a1d28] hover:bg-[#262a3b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2d3246] transition-colors cursor-pointer"
+              className="px-4 py-1.5 text-xs font-mono font-medium rounded-md bg-[#141722] hover:bg-[#23283b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2a3045] transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -254,7 +273,7 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
               type="button"
               disabled={parsedNodes.length === 0}
               onClick={handleImportClick}
-              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-medium rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-semibold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-mono font-semibold rounded-md bg-[#10b981] hover:bg-[#059669] text-[#090a0f] transition-all shadow-[0_0_16px_rgba(16,185,129,0.25)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
               Import {flatNodes.length > 0 ? `(${flatNodes.length} Nodes)` : 'Syllabus'}

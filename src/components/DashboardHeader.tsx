@@ -1,91 +1,114 @@
 'use client';
 
 import React from 'react';
-import { 
-  Upload, 
-  BookOpen, 
-  Flame, 
-  Target, 
-  Clock, 
-  CheckCircle2, 
-  Layers, 
+import {
+  Upload,
+  BookOpen,
+  Flame,
+  Target,
+  Clock,
+  CheckCircle2,
+  GitBranch,
   ShieldCheck,
-  AlertTriangle 
+  AlertTriangle,
 } from 'lucide-react';
 import type { DashboardMetrics } from '../types/syllabus';
+import type { UserProfile } from '../types/user';
+import { UserProfileSwitcher } from './UserProfileSwitcher';
 
 interface DashboardHeaderProps {
   metrics: DashboardMetrics;
   onOpenImport: () => void;
   onOpenReview: () => void;
+  users: UserProfile[];
+  activeUser: UserProfile;
+  onSwitchUser: (userId: string) => void;
+  onCreateUser: (name: string, focusArea: string, color: string) => void;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   metrics,
   onOpenImport,
   onOpenReview,
+  users,
+  activeUser,
+  onSwitchUser,
+  onCreateUser,
 }) => {
-  const completionPercent = metrics.totalNodes > 0
-    ? Math.round((metrics.completedNodes / metrics.totalNodes) * 100)
-    : 0;
+  const completionPercent =
+    metrics.totalNodes > 0
+      ? Math.round((metrics.completedNodes / metrics.totalNodes) * 100)
+      : 0;
 
-  const retentionPercent = metrics.retentionRate <= 1 
-    ? Math.round(metrics.retentionRate * 100) 
-    : Math.round(metrics.retentionRate);
+  const retentionPercent =
+    metrics.retentionRate <= 1
+      ? Math.round(metrics.retentionRate * 100)
+      : Math.round(metrics.retentionRate);
 
   const hasDueReviews = metrics.dueForReviewCount > 0;
 
   return (
     <header className="w-full space-y-6">
       {/* Top Application Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#2d3246]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981] shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-            <Layers className="w-5 h-5" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#2a3045]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-[#141722] border border-[#2a3045] flex items-center justify-center text-[#10b981] shadow-[0_0_16px_rgba(16,185,129,0.15)] relative shrink-0">
+            <GitBranch className="w-5 h-5 text-[#10b981]" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#06b6d4] ring-2 ring-[#090a0f]" />
           </div>
+
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-semibold tracking-tight text-[#f1f5f9] font-sans">
+              <h1 className="text-xl font-bold tracking-tight text-[#f1f5f9]">
                 LearnTree
               </h1>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium tracking-wide bg-[#1a1d28] border border-[#2d3246] text-[#4edea3]">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-[#1b1f2e] border border-[#2a3045] text-[#10b981]">
                 <ShieldCheck className="w-3 h-3 text-[#10b981]" />
                 $0-AI Local-First
               </span>
             </div>
-            <p className="text-xs text-[#94a3b8] font-sans">
-              Hierarchical syllabus tracker with SuperMemo-2 spaced repetition
+            <p className="text-xs text-[#94a3b8] mt-0.5">
+              Hierarchical syllabus tree with SuperMemo-2 active recall scheduling
             </p>
           </div>
         </div>
 
-        {/* Global Action Controls */}
-        <div className="flex items-center gap-2.5">
+        {/* Global Controls & Multi-User Profile Switcher */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          {/* Multi-User Switcher Component */}
+          <UserProfileSwitcher
+            users={users}
+            activeUser={activeUser}
+            onSwitchUser={onSwitchUser}
+            onCreateUser={onCreateUser}
+          />
+
           <button
             type="button"
             onClick={onOpenImport}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded bg-[#1a1d28] hover:bg-[#262a3b] text-[#f1f5f9] border border-[#2d3246] hover:border-[#94a3b8] transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-medium rounded-md bg-[#141722] hover:bg-[#1b1f2e] text-[#f1f5f9] border border-[#2a3045] hover:border-[#06b6d4] transition-all cursor-pointer shadow-sm active:scale-98"
           >
             <Upload className="w-3.5 h-3.5 text-[#06b6d4]" />
-            Import Syllabus
+            <span className="hidden md:inline">Import Syllabus</span>
+            <span className="md:hidden">Import</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenReview}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded transition-all cursor-pointer shadow-sm ${
+            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-medium rounded-md transition-all cursor-pointer shadow-md active:scale-98 ${
               hasDueReviews
-                ? 'bg-[#f59e0b] hover:bg-[#d97706] text-[#090a0f] font-semibold shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                : 'bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-medium shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                ? 'bg-[#f59e0b] hover:bg-[#d97706] text-[#090a0f] font-semibold shadow-[0_0_16px_rgba(245,158,11,0.3)]'
+                : 'bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-semibold shadow-[0_0_16px_rgba(16,185,129,0.25)]'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>Review Queue</span>
             <span
-              className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+              className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
                 hasDueReviews
-                  ? 'bg-[#090a0f]/80 text-[#f59e0b]'
-                  : 'bg-[#090a0f]/80 text-[#10b981]'
+                  ? 'bg-[#090a0f] text-[#f59e0b]'
+                  : 'bg-[#090a0f] text-[#10b981]'
               }`}
             >
               {metrics.dueForReviewCount}
@@ -94,25 +117,28 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       </div>
 
-      {/* KPI 4-Card Dashboard Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      {/* KPI Grid: 4 High-Utility Tiles */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Nodes Completed */}
-        <div className="p-3.5 rounded bg-[#12141c] border border-[#2d3246] hover:border-[#3c445c] transition-colors">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1.5">
-            <span className="font-medium">Nodes Completed</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#10b981]" />
+        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
+            <span className="uppercase tracking-wider text-[11px]">Nodes Completed</span>
+            <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
           </div>
-          <div className="flex items-baseline justify-between mb-2">
-            <div className="text-xl font-semibold text-[#f1f5f9] font-mono tabular-nums">
+          <div className="flex items-baseline justify-between mb-3">
+            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
               {metrics.completedNodes}
-              <span className="text-xs text-[#94a3b8] font-normal ml-1">/ {metrics.totalNodes}</span>
+              <span className="text-xs text-[#94a3b8] font-normal ml-1.5">
+                / {metrics.totalNodes}
+              </span>
             </div>
-            <span className="text-xs font-mono text-[#10b981] font-medium">
+            <span className="text-xs font-mono text-[#10b981] font-semibold bg-[#10b981]/10 px-1.5 py-0.5 rounded border border-[#10b981]/20">
               {completionPercent}%
             </span>
           </div>
-          {/* Segmented / Smooth Progress Bar */}
-          <div className="w-full h-1.5 bg-[#1a1d28] rounded-full overflow-hidden border border-[#2d3246]">
+
+          {/* Dual-tone gradient progress bar */}
+          <div className="w-full h-2 bg-[#1b1f2e] rounded-full overflow-hidden border border-[#2a3045]/80 p-0.5">
             <div
               className="h-full bg-gradient-to-r from-[#06b6d4] to-[#10b981] transition-all duration-300 rounded-full"
               style={{ width: `${Math.min(100, Math.max(0, completionPercent))}%` }}
@@ -122,79 +148,79 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
         {/* Card 2: Due for Review */}
         <div
-          className={`p-3.5 rounded bg-[#12141c] border transition-all ${
+          className={`p-4 rounded-lg bg-[#141722] border transition-all ${
             hasDueReviews
-              ? 'border-[#f59e0b]/50 bg-[#f59e0b]/5 shadow-[0_0_12px_-2px_rgba(245,158,11,0.15)]'
-              : 'border-[#2d3246]'
+              ? 'border-[#f59e0b] bg-[#f59e0b]/5 shadow-[0_0_18px_rgba(245,158,11,0.2)]'
+              : 'border-[#2a3045]'
           }`}
         >
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1.5">
-            <span className="font-medium">Due for Review</span>
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
+            <span className="uppercase tracking-wider text-[11px]">Due for Review</span>
             {hasDueReviews ? (
-              <AlertTriangle className="w-3.5 h-3.5 text-[#f59e0b]" />
+              <AlertTriangle className="w-4 h-4 text-[#f59e0b] animate-pulse" />
             ) : (
-              <Clock className="w-3.5 h-3.5 text-[#94a3b8]" />
+              <Clock className="w-4 h-4 text-[#94a3b8]" />
             )}
           </div>
           <div className="flex items-baseline justify-between">
             <div
-              className={`text-xl font-semibold font-mono tabular-nums ${
+              className={`text-2xl font-bold font-mono tabular-nums ${
                 hasDueReviews ? 'text-[#f59e0b]' : 'text-[#f1f5f9]'
               }`}
             >
               {metrics.dueForReviewCount}
             </div>
             <span
-              className={`text-[11px] font-mono px-1.5 py-0.5 rounded border ${
+              className={`text-[11px] font-mono px-2 py-0.5 rounded border font-medium ${
                 hasDueReviews
                   ? 'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30'
-                  : 'bg-[#1a1d28] text-[#94a3b8] border-[#2d3246]'
+                  : 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045]'
               }`}
             >
               {hasDueReviews ? 'Action Required' : 'All Clear'}
             </span>
           </div>
           <div className="mt-2 text-[11px] text-[#94a3b8]">
-            {hasDueReviews ? 'Nodes ready for SM-2 recall' : 'Next reviews scheduled'}
+            {hasDueReviews ? 'Decaying concepts ready for recall' : 'No overdue reviews right now'}
           </div>
         </div>
 
-        {/* Card 3: Active Recall Streak */}
-        <div className="p-3.5 rounded bg-[#12141c] border border-[#2d3246] hover:border-[#3c445c] transition-colors">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1.5">
-            <span className="font-medium">Recall Streak</span>
-            <Flame className="w-3.5 h-3.5 text-[#f59e0b]" />
+        {/* Card 3: Consolidation Streak */}
+        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
+            <span className="uppercase tracking-wider text-[11px]">Consolidation Streak</span>
+            <Flame className="w-4 h-4 text-[#f59e0b]" />
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-semibold text-[#f1f5f9] font-mono tabular-nums">
+            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
               {metrics.streakDays}
-              <span className="text-xs text-[#94a3b8] font-normal ml-1">days</span>
+              <span className="text-xs text-[#94a3b8] font-normal ml-1.5">days</span>
             </div>
-            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/20">
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/30 font-medium">
               🔥 Active
             </span>
           </div>
           <div className="mt-2 text-[11px] text-[#94a3b8]">
-            Consecutive study cadence
+            Continuous memory reinforcement
           </div>
         </div>
 
-        {/* Card 4: Retention Rate */}
-        <div className="p-3.5 rounded bg-[#12141c] border border-[#2d3246] hover:border-[#3c445c] transition-colors">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1.5">
-            <span className="font-medium">Retention Rate</span>
-            <Target className="w-3.5 h-3.5 text-[#06b6d4]" />
+        {/* Card 4: Retention Rate Projection */}
+        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
+            <span className="uppercase tracking-wider text-[11px]">Retention Rate Projection</span>
+            <Target className="w-4 h-4 text-[#06b6d4]" />
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-semibold text-[#f1f5f9] font-mono tabular-nums">
+            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
               {retentionPercent}%
             </div>
-            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/20">
-              SM-2 Stability
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/30 font-medium">
+              SM-2 Math
             </span>
           </div>
           <div className="mt-2 text-[11px] text-[#94a3b8]">
-            Estimated long-term recall
+            Estimated long-term retrieval stability
           </div>
         </div>
       </div>
