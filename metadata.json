@@ -1,0 +1,6 @@
+{
+  "name": "LearnTree",
+  "description": "Hierarchical syllabus tracker with spaced repetition system (SM-2) for deliberate technical learning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
