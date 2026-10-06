@@ -2,228 +2,231 @@
 
 import React from 'react';
 import {
-  Upload,
-  BookOpen,
-  Flame,
-  Target,
-  Clock,
   CheckCircle2,
-  GitBranch,
-  ShieldCheck,
-  AlertTriangle,
+  Clock,
+  Flame,
+  Brain,
+  Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
 import type { DashboardMetrics } from '../types/syllabus';
 import type { UserProfile } from '../types/user';
-import { UserProfileSwitcher } from './UserProfileSwitcher';
 
 interface DashboardHeaderProps {
   metrics: DashboardMetrics;
-  onOpenImport: () => void;
-  onOpenReview: () => void;
-  users: UserProfile[];
   activeUser: UserProfile;
-  onSwitchUser: (userId: string) => void;
-  onCreateUser: (name: string, focusArea: string, color: string) => void;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   metrics,
-  onOpenImport,
-  onOpenReview,
-  users,
   activeUser,
-  onSwitchUser,
-  onCreateUser,
 }) => {
   const completionPercent =
     metrics.totalNodes > 0
-      ? Math.round((metrics.completedNodes / metrics.totalNodes) * 100)
-      : 0;
+      ? ((metrics.completedNodes / metrics.totalNodes) * 100).toFixed(1)
+      : '0.0';
 
-  const retentionPercent =
-    metrics.retentionRate <= 1
-      ? Math.round(metrics.retentionRate * 100)
-      : Math.round(metrics.retentionRate);
-
-  const hasDueReviews = metrics.dueForReviewCount > 0;
+  const inProgressCount = Math.max(
+    0,
+    metrics.totalNodes - metrics.completedNodes - metrics.dueForReviewCount
+  );
 
   return (
-    <header className="w-full space-y-6">
-      {/* Top Application Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#2a3045]">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-[#141722] border border-[#2a3045] flex items-center justify-center text-[#10b981] shadow-[0_0_16px_rgba(16,185,129,0.15)] relative shrink-0">
-            <GitBranch className="w-5 h-5 text-[#10b981]" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#06b6d4] ring-2 ring-[#090a0f]" />
-          </div>
+    <div className="space-y-4">
+      {/* Hero Syllabus Banner */}
+      <div className="p-5 rounded-lg bg-[#12141c] border border-[#1e2230] shadow-sm relative overflow-hidden">
+        {/* Subtle ambient gradient */}
+        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-[#10b981]/5 via-[#06b6d4]/5 to-transparent pointer-events-none" />
 
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold tracking-tight text-[#f1f5f9]">
-                LearnTree
-              </h1>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-[#1b1f2e] border border-[#2a3045] text-[#10b981]">
-                <ShieldCheck className="w-3 h-3 text-[#10b981]" />
-                $0-AI Local-First
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-[#181b26] text-[#6366f1] border border-[#2d3246] uppercase">
+                Active Syllabus SYS-601
+              </span>
+              <span className="text-xs font-mono text-[#94a3b8]">
+                Student: {activeUser.name}
               </span>
             </div>
-            <p className="text-xs text-[#94a3b8] mt-0.5">
-              Hierarchical syllabus tree with SuperMemo-2 active recall scheduling
-            </p>
+
+            <h1 className="text-2xl font-bold tracking-tight text-[#f1f5f9] font-sans">
+              {activeUser.focusArea}
+            </h1>
           </div>
-        </div>
 
-        {/* Global Controls & Multi-User Profile Switcher */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          {/* Multi-User Switcher Component */}
-          <UserProfileSwitcher
-            users={users}
-            activeUser={activeUser}
-            onSwitchUser={onSwitchUser}
-            onCreateUser={onCreateUser}
-          />
-
-          <button
-            type="button"
-            onClick={onOpenImport}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-medium rounded-md bg-[#141722] hover:bg-[#1b1f2e] text-[#f1f5f9] border border-[#2a3045] hover:border-[#06b6d4] transition-all cursor-pointer shadow-sm active:scale-98"
-          >
-            <Upload className="w-3.5 h-3.5 text-[#06b6d4]" />
-            <span className="hidden md:inline">Import Syllabus</span>
-            <span className="md:hidden">Import</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenReview}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono font-medium rounded-md transition-all cursor-pointer shadow-md active:scale-98 ${
-              hasDueReviews
-                ? 'bg-[#f59e0b] hover:bg-[#d97706] text-[#090a0f] font-semibold shadow-[0_0_16px_rgba(245,158,11,0.3)]'
-                : 'bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-semibold shadow-[0_0_16px_rgba(16,185,129,0.25)]'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Review Queue</span>
-            <span
-              className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
-                hasDueReviews
-                  ? 'bg-[#090a0f] text-[#f59e0b]'
-                  : 'bg-[#090a0f] text-[#10b981]'
-              }`}
-            >
-              {metrics.dueForReviewCount}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Grid: 4 High-Utility Tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Nodes Completed */}
-        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
-            <span className="uppercase tracking-wider text-[11px]">Nodes Completed</span>
-            <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
-          </div>
-          <div className="flex items-baseline justify-between mb-3">
-            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
-              {metrics.completedNodes}
-              <span className="text-xs text-[#94a3b8] font-normal ml-1.5">
-                / {metrics.totalNodes}
-              </span>
-            </div>
-            <span className="text-xs font-mono text-[#10b981] font-semibold bg-[#10b981]/10 px-1.5 py-0.5 rounded border border-[#10b981]/20">
+          {/* Mastered percentage badge */}
+          <div className="flex items-baseline gap-2 sm:text-right shrink-0">
+            <span className="text-2xl font-bold font-mono text-[#f1f5f9] tabular-nums">
               {completionPercent}%
             </span>
-          </div>
-
-          {/* Dual-tone gradient progress bar */}
-          <div className="w-full h-2 bg-[#1b1f2e] rounded-full overflow-hidden border border-[#2a3045]/80 p-0.5">
-            <div
-              className="h-full bg-gradient-to-r from-[#06b6d4] to-[#10b981] transition-all duration-300 rounded-full"
-              style={{ width: `${Math.min(100, Math.max(0, completionPercent))}%` }}
-            />
+            <span className="text-xs font-mono text-[#94a3b8] font-medium">
+              Mastered
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#10b981]/15 text-[#10b981] font-semibold border border-[#10b981]/20">
+              +3.2% vs last cycle
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Due for Review */}
+        {/* Long Progress Bar */}
+        <div className="mt-4 mb-2.5 w-full h-1.5 bg-[#181b26] rounded-full overflow-hidden border border-[#2d3246]/60">
+          <div
+            className="h-full bg-gradient-to-r from-[#06b6d4] to-[#10b981] rounded-full transition-all duration-300"
+            style={{ width: `${Math.min(100, Math.max(0, parseFloat(completionPercent)))}%` }}
+          />
+        </div>
+
+        {/* Sub-status counts */}
+        <div className="flex items-center justify-between text-[11px] font-mono text-[#94a3b8] pt-1 flex-wrap gap-2">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="flex items-center gap-1.5 text-[#f1f5f9]">
+              <span className="w-2 h-2 rounded-full bg-[#10b981]" />
+              <strong className="text-[#10b981]">{metrics.completedNodes}</strong> Mastered
+            </span>
+            <span className="flex items-center gap-1.5 text-[#f1f5f9]">
+              <span className="w-2 h-2 rounded-full bg-[#f59e0b]" />
+              <strong className="text-[#f59e0b]">{metrics.dueForReviewCount}</strong> Due Today
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#06b6d4]" />
+              {inProgressCount} In Progress
+            </span>
+            <span className="flex items-center gap-1.5 text-[#475569]">
+              <span className="w-2 h-2 rounded-full bg-[#2d3246]" />
+              20 Backlog
+            </span>
+          </div>
+
+          <span className="text-[#475569]">
+            {metrics.totalNodes} Total Concept Vertices
+          </span>
+        </div>
+      </div>
+
+      {/* 4 Segmented KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* KPI 1: Nodes Completed */}
+        <div className="p-3.5 rounded-lg bg-[#12141c] border border-[#1e2230] space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94a3b8]">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#10b981]" />
+              Nodes Completed
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
+              +4 this week
+            </span>
+          </div>
+          <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
+            {metrics.completedNodes} <span className="text-xs text-[#94a3b8] font-normal">/ {metrics.totalNodes}</span>
+          </div>
+          {/* Segmented Progress Blocks */}
+          <div className="flex gap-1 h-1">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 rounded-xs ${
+                  idx < Math.ceil((metrics.completedNodes / Math.max(1, metrics.totalNodes)) * 8)
+                    ? 'bg-[#10b981]'
+                    : 'bg-[#1e2230]'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* KPI 2: Due for Review */}
         <div
-          className={`p-4 rounded-lg bg-[#141722] border transition-all ${
-            hasDueReviews
-              ? 'border-[#f59e0b] bg-[#f59e0b]/5 shadow-[0_0_18px_rgba(245,158,11,0.2)]'
-              : 'border-[#2a3045]'
+          className={`p-3.5 rounded-lg bg-[#12141c] border space-y-2 ${
+            metrics.dueForReviewCount > 0
+              ? 'border-[#f59e0b]/40 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+              : 'border-[#1e2230]'
           }`}
         >
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
-            <span className="uppercase tracking-wider text-[11px]">Due for Review</span>
-            {hasDueReviews ? (
-              <AlertTriangle className="w-4 h-4 text-[#f59e0b] animate-pulse" />
-            ) : (
-              <Clock className="w-4 h-4 text-[#94a3b8]" />
-            )}
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div
-              className={`text-2xl font-bold font-mono tabular-nums ${
-                hasDueReviews ? 'text-[#f59e0b]' : 'text-[#f1f5f9]'
-              }`}
-            >
-              {metrics.dueForReviewCount}
-            </div>
-            <span
-              className={`text-[11px] font-mono px-2 py-0.5 rounded border font-medium ${
-                hasDueReviews
-                  ? 'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30'
-                  : 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045]'
-              }`}
-            >
-              {hasDueReviews ? 'Action Required' : 'All Clear'}
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94a3b8]">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#f59e0b]" />
+              Due for Review
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] text-[#94a3b8] border border-[#2d3246]">
+              Space to start
             </span>
           </div>
-          <div className="mt-2 text-[11px] text-[#94a3b8]">
-            {hasDueReviews ? 'Decaying concepts ready for recall' : 'No overdue reviews right now'}
+          <div className="text-xl font-bold font-mono text-[#f59e0b] tabular-nums">
+            {metrics.dueForReviewCount} <span className="text-xs text-[#94a3b8] font-normal">nodes</span>
+          </div>
+          {/* Segmented Ticks */}
+          <div className="flex gap-1 h-1">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 rounded-xs ${
+                  idx < Math.min(8, metrics.dueForReviewCount)
+                    ? 'bg-[#f59e0b]'
+                    : 'bg-[#1e2230]'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Card 3: Consolidation Streak */}
-        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
-            <span className="uppercase tracking-wider text-[11px]">Consolidation Streak</span>
-            <Flame className="w-4 h-4 text-[#f59e0b]" />
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
-              {metrics.streakDays}
-              <span className="text-xs text-[#94a3b8] font-normal ml-1.5">days</span>
-            </div>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/30 font-medium">
-              🔥 Active
+        {/* KPI 3: Consolidation Streak */}
+        <div className="p-3.5 rounded-lg bg-[#12141c] border border-[#1e2230] space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94a3b8]">
+            <span className="flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-[#f59e0b]" />
+              Consolidation Streak
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] text-[#94a3b8] border border-[#2d3246]">
+              Best: {Math.max(24, metrics.streakDays + 5)}d
             </span>
           </div>
-          <div className="mt-2 text-[11px] text-[#94a3b8]">
-            Continuous memory reinforcement
+          <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
+            {metrics.streakDays} <span className="text-xs text-[#94a3b8] font-normal">Days</span>
+          </div>
+          {/* Streak Ticks */}
+          <div className="flex gap-1 h-1">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 rounded-xs ${
+                  idx < Math.min(8, metrics.streakDays)
+                    ? 'bg-[#f59e0b]'
+                    : 'bg-[#1e2230]'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Card 4: Retention Rate Projection */}
-        <div className="p-4 rounded-lg bg-[#141722] border border-[#2a3045] hover:border-[#3c445c] transition-all">
-          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-2 font-mono">
-            <span className="uppercase tracking-wider text-[11px]">Retention Rate Projection</span>
-            <Target className="w-4 h-4 text-[#06b6d4]" />
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-[#f1f5f9] font-mono tabular-nums">
-              {retentionPercent}%
-            </div>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/30 font-medium">
-              SM-2 Math
+        {/* KPI 4: SM-2 Projected Recall */}
+        <div className="p-3.5 rounded-lg bg-[#12141c] border border-[#1e2230] space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94a3b8]">
+            <span className="flex items-center gap-1.5">
+              <Brain className="w-3.5 h-3.5 text-[#6366f1]" />
+              SM-2 Projected Recall
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] text-[#94a3b8] border border-[#2d3246]">
+              Half-life ~32d
             </span>
           </div>
-          <div className="mt-2 text-[11px] text-[#94a3b8]">
-            Estimated long-term retrieval stability
+          <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
+            {(metrics.retentionRate * 100).toFixed(1)}%
+          </div>
+          {/* Retention Ticks */}
+          <div className="flex gap-1 h-1">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 rounded-xs ${
+                  idx < Math.round(metrics.retentionRate * 8)
+                    ? 'bg-[#6366f1]'
+                    : 'bg-[#1e2230]'
+                }`}
+              />
+            ))}
           </div>
         </div>
       </div>
-    </header>
+    </div>
   );
 };

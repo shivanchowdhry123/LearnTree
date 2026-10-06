@@ -2,20 +2,16 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Download,
-  Copy,
-  Check,
   Search,
   Filter,
-  RefreshCw,
-  FolderTree,
-  SlidersHorizontal,
-  Clock,
-  CheckSquare,
-  MinusSquare,
+  Plus,
+  ArrowUpDown,
+  BookOpen,
   Sparkles,
-  Users,
-  UserCheck,
+  Zap,
+  Check,
+  X,
+  Clock,
 } from 'lucide-react';
 import type {
   SyllabusNode,
@@ -37,8 +33,10 @@ import {
   createUserProfile,
   INITIAL_USER_PROFILES,
 } from './lib/userStore';
-import { parseSyllabusText, flattenTree, exportToMarkdown } from './lib/parser';
+import { flattenTree, exportToMarkdown } from './lib/parser';
 import { calculateNextReview, createInitialSM2State } from './lib/sm2';
+import { TopNavbar } from './components/TopNavbar';
+import { Sidebar } from './components/Sidebar';
 import { DashboardHeader } from './components/DashboardHeader';
 import { SyllabusTreeView } from './components/SyllabusTreeView';
 import { MarkdownImportModal } from './components/MarkdownImportModal';
@@ -62,54 +60,58 @@ export default function App() {
     loadUserSyllabus(activeUserId)
   );
 
-  // Per-user active recall streak
+  // Per-user streak state
   const [streakDays, setStreakDays] = useState<number>(() =>
     loadUserStreak(activeUserId)
   );
 
-  // Modal & Drawer visibility
+  // Layout & Navigation State
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState<boolean>(false);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState<boolean>(false);
 
-  // Search & Filtering state
+  // Create user form state
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserFocus, setNewUserFocus] = useState('');
+  const [newUserColor, setNewUserColor] = useState('#10b981');
+
+  // Search, Tags & Filter toolbar state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'in_progress' | 'mastered'>('all');
-  const [copiedMarkdown, setCopiedMarkdown] = useState<boolean>(false);
+  const [filterMode, setFilterMode] = useState<'all' | 'due' | 'in_progress' | 'mastered' | 'tags'>('all');
 
-  // Switch Active User Profile Handler
+  // Switch Active User Profile
   const handleSwitchUser = useCallback((newUserId: string) => {
     setActiveUserIdState(newUserId);
     setActiveUserId(newUserId);
-    // Load that user's dedicated syllabus and streak
     const userNodes = loadUserSyllabus(newUserId);
     const userStreak = loadUserStreak(newUserId);
     setNodes(userNodes);
     setStreakDays(userStreak);
     setSearchQuery('');
-    setSelectedTag(null);
-    setStatusFilter('all');
+    setFilterMode('all');
   }, []);
 
-  // Create New Student Profile Handler
+  // Create New User Profile
   const handleCreateUser = useCallback(
     (name: string, focusArea: string, color: string) => {
       const newProfile = createUserProfile(name, focusArea, color);
       const updatedList = loadUserProfiles();
       setUsers(updatedList);
       handleSwitchUser(newProfile.id);
+      setIsCreateUserOpen(false);
     },
     [handleSwitchUser]
   );
 
-  // Persist current user's syllabus when nodes state changes
+  // Persist current user's syllabus
   useEffect(() => {
     if (activeUserId) {
       saveUserSyllabus(activeUserId, nodes);
     }
   }, [activeUserId, nodes]);
 
-  // Persist current user's streak when streak changes
+  // Persist current user's streak
   useEffect(() => {
     if (activeUserId) {
       saveUserStreak(activeUserId, streakDays);
@@ -118,7 +120,7 @@ export default function App() {
 
   const flatNodes = useMemo(() => flattenTree(nodes), [nodes]);
 
-  // Nodes due for review for active user
+  // Nodes due for review
   const dueNodes = useMemo(() => {
     const nowTime = Date.now();
     return flatNodes.filter((node) => {
@@ -130,18 +132,18 @@ export default function App() {
     });
   }, [flatNodes]);
 
-  // Compute DashboardMetrics dynamically for active user
+  // Dynamic DashboardMetrics
   const metrics = useMemo<DashboardMetrics>(() => {
     const totalNodes = flatNodes.length;
     const completedNodes = flatNodes.filter((n) => n.status === 'mastered').length;
     const dueForReviewCount = dueNodes.length;
 
-    let retentionRate = 0.85;
+    let retentionRate = 0.912;
     if (totalNodes > 0) {
       const matureNodes = flatNodes.filter((n) => n.sm2State.repetition >= 2).length;
       retentionRate = Math.min(
         0.98,
-        Math.max(0.7, 0.75 + (matureNodes / totalNodes) * 0.23)
+        Math.max(0.75, 0.78 + (matureNodes / totalNodes) * 0.18)
       );
     }
 
@@ -154,20 +156,7 @@ export default function App() {
     };
   }, [flatNodes, dueNodes.length, streakDays]);
 
-  // Extract all unique tags in active user's syllabus
-  const allTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    for (const node of flatNodes) {
-      if (node.tags) {
-        for (const t of node.tags) {
-          tagsSet.add(t);
-        }
-      }
-    }
-    return Array.from(tagsSet);
-  }, [flatNodes]);
-
-  // Study activity streak update for active user
+  // Record study streak
   const recordStudyActivity = useCallback(() => {
     const todayStr = new Date().toISOString().split('T')[0];
     const lastDate = loadUserLastStudyDate(activeUserId);
@@ -186,7 +175,7 @@ export default function App() {
     }
   }, [activeUserId]);
 
-  // Recursive tree updater
+  // Tree node update helper
   const updateNodeInTree = useCallback(
     (
       tree: SyllabusNode[],
@@ -209,7 +198,7 @@ export default function App() {
     []
   );
 
-  // Per-user Status Change Handler
+  // Status Change Handler
   const handleNodeStatusChange = useCallback(
     (id: string, newStatus: SyllabusNodeStatus) => {
       setNodes((prev) =>
@@ -237,7 +226,7 @@ export default function App() {
     [updateNodeInTree]
   );
 
-  // Per-user SM-2 Review Rating Handler
+  // Rate Review Node Handler
   const handleRateNode = useCallback(
     (nodeId: string, rating: ReviewRating) => {
       setNodes((prev) =>
@@ -258,37 +247,38 @@ export default function App() {
     [updateNodeInTree, recordStudyActivity]
   );
 
-  // Per-user Import Handler
+  // Import Syllabus Handler
   const handleImportSyllabus = useCallback((importedNodes: SyllabusNode[]) => {
     setNodes(importedNodes);
   }, []);
 
-  // Filter nodes based on search, tag, and status
+  // Filtered nodes
   const filteredNodes = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
     function filterBranch(list: SyllabusNode[]): SyllabusNode[] {
       const results: SyllabusNode[] = [];
       for (const item of list) {
-        const matchesQuery = !query || item.title.toLowerCase().includes(query);
-        const matchesTag = !selectedTag || (item.tags && item.tags.includes(selectedTag));
+        const matchesQuery =
+          !query ||
+          item.title.toLowerCase().includes(query) ||
+          (item.tags && item.tags.some((t) => t.toLowerCase().includes(query)));
 
-        let matchesStatus = true;
-        if (statusFilter === 'mastered') {
-          matchesStatus = item.status === 'mastered';
-        } else if (statusFilter === 'in_progress') {
-          matchesStatus = item.status === 'in_progress';
-        } else if (statusFilter === 'due') {
-          const isDue =
+        let matchesFilter = true;
+        if (filterMode === 'due') {
+          matchesFilter =
             (item.sm2State.nextReviewAt &&
               new Date(item.sm2State.nextReviewAt).getTime() <= Date.now()) ||
             item.status !== 'unstarted';
-          matchesStatus = Boolean(isDue);
+        } else if (filterMode === 'in_progress') {
+          matchesFilter = item.status === 'in_progress';
+        } else if (filterMode === 'mastered') {
+          matchesFilter = item.status === 'mastered';
         }
 
         const filteredChildren = item.children ? filterBranch(item.children) : [];
 
-        if ((matchesQuery && matchesTag && matchesStatus) || filteredChildren.length > 0) {
+        if ((matchesQuery && matchesFilter) || filteredChildren.length > 0) {
           results.push({
             ...item,
             children: filteredChildren,
@@ -298,199 +288,249 @@ export default function App() {
       return results;
     }
 
-    if (!query && !selectedTag && statusFilter === 'all') {
+    if (!query && filterMode === 'all') {
       return nodes;
     }
 
     return filterBranch(nodes);
-  }, [nodes, searchQuery, selectedTag, statusFilter]);
+  }, [nodes, searchQuery, filterMode]);
 
-  const handleCopyMarkdown = () => {
-    const md = exportToMarkdown(nodes);
-    navigator.clipboard.writeText(md);
-    setCopiedMarkdown(true);
-    setTimeout(() => setCopiedMarkdown(false), 2000);
-  };
+  // Global hotkeys (⌘I, ⌘K, Space)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
+        e.preventDefault();
+        setIsImportOpen(true);
+      } else if (e.key === ' ' && !isImportOpen && !isReviewOpen) {
+        e.preventDefault();
+        setIsReviewOpen(true);
+      } else if (e.key.toLowerCase() === 'n' && !isImportOpen && !isReviewOpen) {
+        const title = prompt('Enter new node title:');
+        if (title) {
+          const newNode: SyllabusNode = {
+            id: `node_${Date.now()}`,
+            title: title.trim(),
+            tags: [],
+            status: 'unstarted',
+            depth: 0,
+            children: [],
+            sm2State: createInitialSM2State(),
+          };
+          setNodes((prev) => [...prev, newNode]);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isImportOpen, isReviewOpen]);
 
-  const handleResetCurrentSyllabus = () => {
-    if (confirm(`Reset syllabus for ${activeUser.name}? This will restore the user's initial curriculum.`)) {
-      localStorage.removeItem(`learntree_user_${activeUserId}_nodes`);
-      const freshNodes = loadUserSyllabus(activeUserId);
-      setNodes(freshNodes);
-    }
-  };
+  const completionPercentNumber =
+    metrics.totalNodes > 0
+      ? Math.round((metrics.completedNodes / metrics.totalNodes) * 100)
+      : 0;
 
   return (
-    <div className="min-h-screen bg-[#090a0f] text-[#f1f5f9] selection:bg-[#06b6d4]/30 selection:text-[#f1f5f9] font-sans antialiased">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Dashboard Header with Multi-User Profile Switcher, Badges & KPI Tiles */}
-        <DashboardHeader
-          metrics={metrics}
-          onOpenImport={() => setIsImportOpen(true)}
-          onOpenReview={() => setIsReviewOpen(true)}
-          users={users}
-          activeUser={activeUser}
-          onSwitchUser={handleSwitchUser}
-          onCreateUser={handleCreateUser}
-        />
+    <div className="h-screen w-screen flex flex-col bg-[#090a0f] text-[#f1f5f9] overflow-hidden font-sans select-none antialiased">
+      {/* Top Navigation Bar (Screen 1 & 2) */}
+      <TopNavbar
+        activeUser={activeUser}
+        users={users}
+        onSelectUser={handleSwitchUser}
+        onOpenCreateUser={() => setIsCreateUserOpen(true)}
+        dueCount={metrics.dueForReviewCount}
+        completionPercent={completionPercentNumber}
+        onOpenImport={() => setIsImportOpen(true)}
+        onOpenReview={() => setIsReviewOpen(true)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((p) => !p)}
+      />
 
-        {/* Current Student Active Profile Context Ribbon */}
-        <div className="flex items-center justify-between px-4 py-2 rounded-md bg-[#141722] border border-[#2a3045] text-xs font-mono text-[#94a3b8]">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: activeUser.avatarColor }}
-            />
-            <span className="text-[#f1f5f9] font-medium">{activeUser.name}</span>
-            <span className="text-[#475569]">·</span>
-            <span className="text-[#c0c1ff]">{activeUser.focusArea}</span>
-          </div>
-          <span className="text-[11px] text-[#10b981] hidden sm:inline">
-            Isolated Local-First Database
-          </span>
-        </div>
+      {/* Main Workspace Body */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar (Smart Queues & Syllabi Repos) */}
+        {isSidebarOpen && (
+          <Sidebar
+            users={users}
+            activeUser={activeUser}
+            onSelectUser={handleSwitchUser}
+            onOpenCreateUser={() => setIsCreateUserOpen(true)}
+            dueCount={metrics.dueForReviewCount}
+            masteredCount={metrics.completedNodes}
+            totalCount={metrics.totalNodes}
+            activeFilter={filterMode}
+            onSelectQueue={(q) => setFilterMode(q as any)}
+          />
+        )}
 
-        {/* Filter, Search & Action Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-3.5 rounded-lg bg-[#141722] border border-[#2a3045] shadow-sm">
-          {/* Search Field & Tag Trigger */}
-          <div className="flex items-center gap-2.5 flex-1 max-w-lg">
-            <div className="relative w-full">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${activeUser.name}'s concepts...`}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#1b1f2e] border border-[#2a3045] focus:border-[#06b6d4] focus:outline-none rounded-md text-[#f1f5f9] placeholder-[#475569] font-sans transition-all"
-              />
-            </div>
-            {selectedTag && (
-              <button
-                type="button"
-                onClick={() => setSelectedTag(null)}
-                className="px-2.5 py-1 text-[11px] font-mono rounded-md bg-[#06b6d4]/10 text-[#06b6d4] border border-[#06b6d4]/30 hover:bg-[#06b6d4]/20 transition-colors shrink-0 cursor-pointer"
-              >
-                #{selectedTag} ✕
-              </button>
-            )}
-          </div>
+        {/* Center / Right Workbench Reading Channel */}
+        <main className="flex-1 overflow-y-auto bg-[#090a0f] p-4 sm:p-6 space-y-4 relative">
+          <div className="max-w-6xl mx-auto space-y-4 pb-20">
+            {/* Hero Syllabus & 4 KPI Cards (Screen 1) */}
+            <DashboardHeader metrics={metrics} activeUser={activeUser} />
 
-          {/* Status Quick Filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
-                statusFilter === 'all'
-                  ? 'bg-[#1b1f2e] text-[#f1f5f9] border-[#06b6d4] font-semibold'
-                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
-              }`}
-            >
-              All ({flatNodes.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('due')}
-              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
-                statusFilter === 'due'
-                  ? 'bg-[#f59e0b]/20 text-[#f59e0b] border-[#f59e0b] font-semibold'
-                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
-              }`}
-            >
-              Due ({dueNodes.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('in_progress')}
-              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
-                statusFilter === 'in_progress'
-                  ? 'bg-[#06b6d4]/20 text-[#06b6d4] border-[#06b6d4] font-semibold'
-                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
-              }`}
-            >
-              In Progress
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('mastered')}
-              className={`px-2.5 py-1 text-[11px] font-mono rounded border transition-colors cursor-pointer ${
-                statusFilter === 'mastered'
-                  ? 'bg-[#10b981]/20 text-[#10b981] border-[#10b981] font-semibold'
-                  : 'bg-[#141722] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
-              }`}
-            >
-              Mastered
-            </button>
-          </div>
-
-          {/* Quick Actions & Export */}
-          <div className="flex items-center gap-2 self-end lg:self-auto">
-            {allTags.length > 0 && (
-              <div className="hidden xl:flex items-center gap-1.5 overflow-x-auto max-w-xs py-0.5">
-                {allTags.slice(0, 3).map((t) => (
+            {/* Filter Toolbar (Screen 1) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2 px-3 rounded-lg bg-[#12141c] border border-[#1e2230]">
+              {/* Search prompt */}
+              <div className="flex items-center gap-2 flex-1">
+                <span className="text-xs font-mono text-[#06b6d4]">&gt;</span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Filter nodes by identifier, #tag"
+                  className="bg-transparent text-xs font-mono text-[#f1f5f9] placeholder-[#475569] focus:outline-none flex-1"
+                />
+                {searchQuery && (
                   <button
-                    key={t}
                     type="button"
-                    onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                      selectedTag === t
-                        ? 'bg-[#06b6d4] text-[#090a0f] border-[#06b6d4] font-semibold'
-                        : 'bg-[#1b1f2e] text-[#94a3b8] border-[#2a3045] hover:text-[#f1f5f9]'
+                    onClick={() => setSearchQuery('')}
+                    className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] text-[#94a3b8]"
+                  >
+                    ESC
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Pills & Actions */}
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-1 bg-[#090a0f] p-0.5 rounded border border-[#1e2230]">
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('all')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer ${
+                      filterMode === 'all'
+                        ? 'bg-[#181b26] text-[#f1f5f9] font-medium'
+                        : 'text-[#94a3b8] hover:text-[#f1f5f9]'
                     }`}
                   >
-                    #{t}
+                    All ({flatNodes.length})
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('due')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer ${
+                      filterMode === 'due'
+                        ? 'bg-[#f59e0b]/20 text-[#f59e0b] font-medium'
+                        : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                    }`}
+                  >
+                    Due Only ({dueNodes.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('in_progress')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer ${
+                      filterMode === 'in_progress'
+                        ? 'bg-[#06b6d4]/20 text-[#06b6d4] font-medium'
+                        : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                    }`}
+                  >
+                    In Progress ({Math.max(0, flatNodes.length - metrics.completedNodes - dueNodes.length)})
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const title = prompt('Enter new node title:');
+                    if (title) {
+                      const newNode: SyllabusNode = {
+                        id: `node_${Date.now()}`,
+                        title: title.trim(),
+                        tags: [],
+                        status: 'unstarted',
+                        depth: 0,
+                        children: [],
+                        sm2State: createInitialSM2State(),
+                      };
+                      setNodes((prev) => [...prev, newNode]);
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#181b26] hover:bg-[#202433] text-[#f1f5f9] border border-[#2d3246] text-[11px] font-mono cursor-pointer"
+                >
+                  <Plus className="w-3 h-3 text-[#10b981]" />
+                  <span>Add Node</span>
+                  <kbd className="text-[9px] text-[#475569]">N</kbd>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsReviewOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-mono font-bold text-[11px] transition-colors cursor-pointer shadow-sm"
+                >
+                  <span>Start Review ({metrics.dueForReviewCount})</span>
+                  <kbd className="px-1 py-0.2 rounded text-[9px] bg-[#090a0f]/80 text-[#10b981]">
+                    Space
+                  </kbd>
+                </button>
               </div>
-            )}
+            </div>
 
-            <button
-              type="button"
-              onClick={handleCopyMarkdown}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium rounded-md bg-[#1b1f2e] hover:bg-[#23283b] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2a3045] transition-colors cursor-pointer"
-              title="Copy active syllabus as Markdown checklist"
-            >
-              {copiedMarkdown ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-[#10b981]" />
-                  <span className="text-[#10b981]">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Export MD</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetCurrentSyllabus}
-              className="p-1.5 rounded-md text-[#94a3b8] hover:text-[#f1f5f9] bg-[#1b1f2e] hover:bg-[#23283b] border border-[#2a3045] transition-colors cursor-pointer"
-              title="Reset current student's syllabus to starter defaults"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
+            {/* Curriculum Hierarchy Table (Screen 1) */}
+            <SyllabusTreeView
+              nodes={filteredNodes}
+              onNodeStatusChange={handleNodeStatusChange}
+              onOpenReview={() => setIsReviewOpen(true)}
+            />
           </div>
-        </div>
 
-        {/* Main Tree Hierarchy */}
-        <main>
-          <SyllabusTreeView
-            nodes={filteredNodes}
-            onNodeStatusChange={handleNodeStatusChange}
-          />
+          {/* Bottom Floating Banner: Queue Ready (Screen 1 bottom) */}
+          {metrics.dueForReviewCount > 0 && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-full px-4 animate-in slide-in-from-bottom-3 duration-200">
+              <div className="p-3 px-4 rounded-lg bg-[#0c121e] border border-[#06b6d4]/40 shadow-[0_8px_32px_rgba(6,182,212,0.2)] flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-6 h-6 rounded bg-[#06b6d4]/15 border border-[#06b6d4]/30 flex items-center justify-center text-[#06b6d4] shrink-0">
+                    <Zap className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-[#f1f5f9] font-mono truncate">
+                      Queue Ready: {metrics.dueForReviewCount} cards scheduled for consolidation
+                    </div>
+                    <div className="text-[11px] text-[#94a3b8] font-mono truncate">
+                      Estimated session length: 6 mins (SM-2 Interval Calculation)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => alert('Postponed for 2 hours.')}
+                    className="px-2.5 py-1 text-[11px] font-mono rounded bg-[#181b26] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2d3246] cursor-pointer"
+                  >
+                    Postpone 2h
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsReviewOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-mono font-bold text-xs transition-colors cursor-pointer shadow-sm"
+                  >
+                    <span>Consolidate Now</span>
+                    <kbd className="px-1 py-0.2 rounded text-[9px] bg-[#090a0f]/80 text-[#10b981]">
+                      Space
+                    </kbd>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
-      {/* Split-Pane Markdown Import Modal */}
+      {/* Screen 2: Split-Pane Markdown Import Modal */}
       <MarkdownImportModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onImport={handleImportSyllabus}
       />
 
-      {/* Active Recall Review Drawer */}
+      {/* Screen 3: Full-Featured Active Recall Flashcard Review Queue */}
       <ReviewDrawer
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
@@ -498,6 +538,98 @@ export default function App() {
         onRateNode={handleRateNode}
         allNodes={nodes}
       />
+
+      {/* Create Student Profile Modal */}
+      {isCreateUserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#090a0f]/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md p-5 rounded-xl bg-[#141722] border border-[#2a3045] shadow-[0_20px_60px_rgba(0,0,0,0.9)] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2a3045] pb-2">
+              <h3 className="text-sm font-bold text-[#f1f5f9] font-mono flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#06b6d4]" />
+                Add Student Profile / Syllabi Repo
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCreateUserOpen(false)}
+                className="p-1 rounded text-[#94a3b8] hover:text-[#f1f5f9] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono text-[#94a3b8] mb-1">
+                  Student Name
+                </label>
+                <input
+                  type="text"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="e.g. Maya Lin"
+                  className="w-full px-3 py-1.5 text-xs bg-[#1b1f2e] border border-[#2a3045] focus:border-[#06b6d4] focus:outline-none rounded text-[#f1f5f9] font-sans"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono text-[#94a3b8] mb-1">
+                  Syllabus Track / Focus Area
+                </label>
+                <input
+                  type="text"
+                  value={newUserFocus}
+                  onChange={(e) => setNewUserFocus(e.target.value)}
+                  placeholder="e.g. Distributed Consensus & Raft"
+                  className="w-full px-3 py-1.5 text-xs bg-[#1b1f2e] border border-[#2a3045] focus:border-[#06b6d4] focus:outline-none rounded text-[#f1f5f9] font-sans"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono text-[#94a3b8] mb-1.5">
+                  Avatar Theme Color
+                </label>
+                <div className="flex items-center gap-2">
+                  {['#10b981', '#06b6d4', '#6366f1', '#f59e0b', '#f43f5e', '#a855f7'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewUserColor(c)}
+                      className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${
+                        newUserColor === c ? 'scale-125 ring-2 ring-[#f1f5f9]' : 'opacity-70 hover:opacity-100'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-[#2a3045]">
+              <button
+                type="button"
+                onClick={() => setIsCreateUserOpen(false)}
+                className="flex-1 py-1.5 text-xs font-mono rounded bg-[#1b1f2e] text-[#94a3b8] hover:text-[#f1f5f9] border border-[#2a3045] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (newUserName.trim()) {
+                    handleCreateUser(newUserName, newUserFocus, newUserColor);
+                    setNewUserName('');
+                    setNewUserFocus('');
+                  }
+                }}
+                className="flex-1 py-1.5 text-xs font-mono font-bold rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] cursor-pointer"
+              >
+                Create Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

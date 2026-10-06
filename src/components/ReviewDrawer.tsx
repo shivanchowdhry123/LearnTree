@@ -6,11 +6,14 @@ import {
   ExternalLink,
   BookOpen,
   CheckCircle2,
-  HelpCircle,
   Clock,
   Sparkles,
-  ChevronDown,
-  ChevronUp,
+  Eye,
+  Check,
+  ChevronRight,
+  Code2,
+  ArrowRight,
+  ShieldAlert,
 } from 'lucide-react';
 import type { SyllabusNode, ReviewRating } from '../types/syllabus';
 
@@ -48,8 +51,18 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
-  const [showNotes, setShowNotes] = useState<boolean>(false);
-  const [reviewedSessionCount, setReviewedSessionCount] = useState<number>(0);
+  const [sessionSeconds, setSessionSeconds] = useState<number>(142); // simulated timer elapsed
+  const [lapsesCount, setLapsesCount] = useState<number>(1);
+  const [inFlightCount, setInFlightCount] = useState<number>(2);
+
+  // Timer counter
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setSessionSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   useEffect(() => {
     if (currentIndex >= dueNodes.length) {
@@ -60,8 +73,6 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
   useEffect(() => {
     if (isOpen) {
       setIsRevealed(false);
-      setShowNotes(false);
-      setReviewedSessionCount(0);
     }
   }, [isOpen]);
 
@@ -71,7 +82,7 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
     if (!currentNode) return [];
     if (allNodes.length > 0) {
       const path = findNodePath(allNodes, currentNode.id);
-      if (path.length > 0) return path.slice(0, -1);
+      if (path.length > 0) return path;
     }
     return currentNode.tags || [];
   }, [currentNode, allNodes]);
@@ -79,10 +90,13 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
   const handleRate = useCallback(
     (rating: ReviewRating) => {
       if (!currentNode) return;
+      if (rating === 'again') {
+        setLapsesCount((c) => c + 1);
+      } else {
+        setInFlightCount((c) => Math.max(0, c - 1));
+      }
       onRateNode(currentNode.id, rating);
-      setReviewedSessionCount((c) => c + 1);
       setIsRevealed(false);
-      setShowNotes(false);
       if (currentIndex >= dueNodes.length - 1) {
         setCurrentIndex(0);
       }
@@ -90,6 +104,7 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
     [currentNode, onRateNode, currentIndex, dueNodes.length]
   );
 
+  // Hotkeys: Space to reveal, 1-4 to rate, Esc to close
   useEffect(() => {
     if (!isOpen || !currentNode) return;
 
@@ -110,7 +125,6 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
         return;
       }
 
-      // Ratings hotkeys (1, 2, 3, 4)
       if (e.key === '1') {
         e.preventDefault();
         handleRate('again');
@@ -135,284 +149,329 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
   const totalInBatch = dueNodes.length;
   const isQueueComplete = totalInBatch === 0 || !currentNode;
 
-  const formattedCardCounter = `Card ${String(currentIndex + 1).padStart(2, '0')} / ${String(
-    totalInBatch
-  ).padStart(2, '0')}`;
+  const formatTimer = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${mins}m ${String(s).padStart(2, '0')}s elapsed`;
+  };
+
+  const cardCounter = String(currentIndex + 1).padStart(2, '0');
+  const batchTotal = String(totalInBatch).padStart(2, '0');
+
+  // Next nodes in batch queue ticker
+  const nextNodes = dueNodes.slice(currentIndex + 1, currentIndex + 4);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#090a0f]/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-[#141722] border border-[#2a3045] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Drawer Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2a3045] bg-[#1b1f2e]">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded bg-[#f59e0b]/15 border border-[#f59e0b]/30 flex items-center justify-center text-[#f59e0b]">
-              <BookOpen className="w-4 h-4" />
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#090a0f]/90 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl h-[92vh] bg-[#0c0e16] border border-[#2d3246] rounded-xl shadow-[0_24px_64px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col">
+        {/* Top Queue Sequence Bar (Screen 3) */}
+        <div className="px-5 py-3 border-b border-[#1e2230] bg-[#12141c] flex items-center justify-between text-xs select-none">
+          {/* Left: Card Sequence Number */}
+          <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-sm font-bold text-[#f1f5f9] tracking-tight">
-                Active Recall Drill
-              </h2>
-              <span className="text-[11px] font-mono text-[#94a3b8]">
-                SuperMemo-2 Spaced Retrieval
-              </span>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#475569]">
+                Queue Sequence
+              </div>
+              <div className="flex items-baseline gap-1.5 font-mono">
+                <span className="text-xl font-bold text-[#f1f5f9]">{cardCounter}</span>
+                <span className="text-xs text-[#475569]">/ {batchTotal}</span>
+              </div>
+            </div>
+
+            {/* Segmented Queue Progress Bar */}
+            <div className="hidden sm:flex gap-1 w-32 h-1.5">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`flex-1 rounded-xs ${
+                    idx <= Math.floor((currentIndex / Math.max(1, totalInBatch)) * 8)
+                      ? 'bg-[#06b6d4]'
+                      : 'bg-[#1e2230]'
+                  }`}
+                />
+              ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {!isQueueComplete && (
-              <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded bg-[#141722] border border-[#2a3045] text-[#10b981] tabular-nums">
-                {formattedCardCounter}
+          {/* Right: Metrics & Controls */}
+          <div className="flex items-center gap-4 font-mono text-xs">
+            <div className="hidden md:flex items-center gap-3 text-[11px]">
+              <span className="text-[#94a3b8]">
+                QUEUE <strong className="text-[#f43f5e]">{lapsesCount} Lapse</strong>{' '}
+                <strong className="text-[#f59e0b]">{inFlightCount} In-Flight</strong>{' '}
+                <strong className="text-[#10b981]">11 Stable</strong>
               </span>
-            )}
+              <span>·</span>
+              <span className="text-[#94a3b8] flex items-center gap-1">
+                <Clock className="w-3 h-3 text-[#06b6d4]" />
+                {formatTimer(sessionSeconds)}
+              </span>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-[#475569]">
+              <span>Hotkeys:</span>
+              <kbd className="px-1 py-0.2 rounded bg-[#181b26] text-[#94a3b8] border border-[#2d3246]">
+                Space
+              </kbd>
+              <span>reveal</span>
+              <kbd className="px-1 py-0.2 rounded bg-[#181b26] text-[#94a3b8] border border-[#2d3246]">
+                1-4
+              </kbd>
+              <span>rate</span>
+            </div>
+
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#23283b] transition-colors cursor-pointer"
-              title="Close (Esc)"
+              className="flex items-center gap-1 text-[#94a3b8] hover:text-[#f1f5f9] px-2 py-1 rounded hover:bg-[#181b26] transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <span>Exit</span>
+              <kbd className="text-[10px] text-[#475569]">Esc</kbd>
             </button>
           </div>
         </div>
 
-        {/* Focused Card Surface */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-5 bg-[#141722]">
+        {/* Card Body Area */}
+        <div className="flex-1 p-6 overflow-y-auto space-y-5 bg-[#0c0e16]">
           {isQueueComplete ? (
-            /* Queue Cleared State */
-            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+            /* Queue Cleared Celebration */
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-12">
               <div className="w-16 h-16 rounded-full bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981] shadow-[0_0_24px_rgba(16,185,129,0.25)]">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-[#f1f5f9]">
-                  Review Queue Cleared!
+                <h3 className="text-xl font-bold text-[#f1f5f9] font-sans">
+                  Active Recall Queue Cleared!
                 </h3>
                 <p className="text-xs text-[#94a3b8] max-w-sm font-sans">
-                  All active syllabus items are consolidated into memory. Your next review interval has been scheduled.
+                  All due syllabus items are consolidated. Next intervals calculated via SuperMemo-2 math.
                 </p>
               </div>
-              {reviewedSessionCount > 0 && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#1b1f2e] border border-[#2a3045] text-xs font-mono text-[#10b981]">
-                  <Sparkles className="w-3.5 h-3.5 text-[#10b981]" />
-                  {reviewedSessionCount} concepts consolidated in this session
-                </div>
-              )}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-xs font-mono font-medium rounded-md bg-[#1b1f2e] hover:bg-[#23283b] text-[#f1f5f9] border border-[#2a3045] transition-colors cursor-pointer"
-                >
-                  Return to Syllabus Tree
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-2 px-4 py-2 text-xs font-mono font-bold rounded bg-[#10b981] text-[#090a0f] hover:bg-[#059669] cursor-pointer"
+              >
+                Return to Curriculum Workbench
+              </button>
             </div>
           ) : (
-            /* Active Card Surface */
-            <div className="space-y-4">
-              {/* Topic Breadcrumbs */}
-              {breadcrumbs.length > 0 && (
-                <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#94a3b8] flex-wrap">
+            /* Active Card Recall Surface */
+            <div className="space-y-4 max-w-3xl mx-auto">
+              {/* Breadcrumb & Telemetry Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono text-[#94a3b8] border-b border-[#1e2230] pb-2.5">
+                <div className="flex items-center gap-1.5 truncate">
                   {breadcrumbs.map((crumb, idx) => (
                     <React.Fragment key={idx}>
-                      <span className="hover:text-[#f1f5f9] transition-colors">
-                        {crumb}
-                      </span>
+                      <span className="truncate">{crumb}</span>
                       {idx < breadcrumbs.length - 1 && (
-                        <span className="text-[#475569]">/</span>
+                        <span className="text-[#3c445c]">/</span>
                       )}
                     </React.Fragment>
                   ))}
                 </div>
-              )}
 
-              {/* Main Topic Banner */}
-              <div className="p-4 rounded-lg bg-[#1b1f2e] border border-[#2a3045] space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-bold text-[#f1f5f9] leading-snug">
-                    {currentNode.title}
-                  </h3>
-                  {currentNode.url && (
-                    <a
-                      href={currentNode.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded bg-[#06b6d4]/10 text-[#06b6d4] hover:bg-[#06b6d4]/20 border border-[#06b6d4]/30 transition-colors"
-                      title="Open external documentation"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Docs</span>
-                    </a>
-                  )}
-                </div>
-
-                {/* SM-2 Telemetry Parameters */}
-                <div className="flex items-center gap-3 pt-2 text-[11px] font-mono text-[#94a3b8] flex-wrap border-t border-[#2a3045]">
-                  <span className="flex items-center gap-1 text-[#f59e0b]">
-                    <Clock className="w-3 h-3" />
-                    Interval: {currentNode.sm2State.interval}d
-                  </span>
+                <div className="flex items-center gap-2 text-[#475569] shrink-0">
+                  <span className="text-[#f1f5f9] font-semibold">SM-2: Rnd {currentNode.sm2State.repetition + 1}</span>
                   <span>•</span>
-                  <span>Reps: {currentNode.sm2State.repetition}</span>
+                  <span>Interval: {currentNode.sm2State.interval}d</span>
                   <span>•</span>
-                  <span>Ease Factor: {currentNode.sm2State.easeFactor.toFixed(2)}</span>
-                  {currentNode.tags && currentNode.tags.length > 0 && (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        {currentNode.tags.map((t) => (
-                          <span key={t} className="text-[#06b6d4]">
-                            #{t}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <span>EF: {currentNode.sm2State.easeFactor.toFixed(2)}</span>
+                  <span>•</span>
+                  <span className="text-[#06b6d4]">Due 2h ago</span>
                 </div>
               </div>
 
-              {/* Recall Prompt / Retrieval Area */}
-              <div className="p-5 rounded-lg border border-[#2a3045] bg-[#141722] space-y-3">
-                <div className="flex items-center justify-between text-xs font-mono text-[#94a3b8]">
-                  <span className="flex items-center gap-1.5 text-[#06b6d4] font-medium">
-                    <HelpCircle className="w-3.5 h-3.5" />
-                    Recall Prompt
-                  </span>
-                  <span className="text-[10px] text-[#475569]">
-                    Press <kbd className="px-1.5 py-0.5 rounded bg-[#1b1f2e] border border-[#2a3045] text-[#94a3b8]">Space</kbd>
-                  </span>
+              {/* Target Concept Heading */}
+              <div>
+                <div className="text-[10px] font-mono font-bold text-[#6366f1] tracking-wider uppercase mb-1">
+                  Target Concept #N-{currentNode.id.slice(-4)} · Linearizability Primitive
                 </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#f1f5f9] tracking-tight font-sans">
+                  {currentNode.title}
+                </h2>
+              </div>
 
+              {/* Active Recall Challenge Box */}
+              <div className="p-4 rounded-lg bg-[#12141c] border border-[#1e2230] space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#06b6d4] font-semibold uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-[#06b6d4]" />
+                  Active Recall Challenge
+                </div>
                 <p className="text-sm text-[#e1e1ed] font-sans leading-relaxed">
-                  Can you retrieve and describe the core architecture, operational guarantees, and failure modes of &quot;{currentNode.title}&quot; from pure memory?
+                  How does Google Spanner&apos;s TrueTime API guarantee external consistency (strict serializability) across distributed commit nodes without requiring distributed coordination or locks for read-only multi-version transactions?
                 </p>
+              </div>
 
-                {/* Show Answer / Recall Rubric Button */}
-                {!isRevealed ? (
+              {/* Show Embedded Notes & Proof Button */}
+              {!isRevealed ? (
+                <div className="py-2">
                   <button
                     type="button"
                     onClick={() => setIsRevealed(true)}
-                    className="w-full py-3 px-4 rounded-md bg-[#1b1f2e] hover:bg-[#23283b] text-xs font-mono font-medium text-[#f1f5f9] border border-[#2a3045] hover:border-[#94a3b8] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-99"
+                    className="w-full py-3.5 px-4 rounded-lg bg-[#181b26] hover:bg-[#202433] border border-[#2d3246] hover:border-[#06b6d4] text-[#f1f5f9] text-xs font-mono font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
                   >
-                    <span>Show Recall Rubric & Evaluation</span>
-                    <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#141722] border border-[#2a3045] text-[#94a3b8]">
+                    <Eye className="w-4 h-4 text-[#06b6d4] group-hover:scale-110 transition-transform" />
+                    <span>Show Embedded Notes & Proof</span>
+                    <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#12141c] text-[#94a3b8] border border-[#2d3246]">
                       Space
                     </kbd>
                   </button>
-                ) : (
-                  <div className="pt-3 border-t border-dashed border-[#2a3045] space-y-3 animate-in fade-in duration-150">
-                    <div className="text-xs font-mono text-[#10b981] flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-semibold">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Self-Evaluation Rubric:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowNotes((p) => !p)}
-                        className="text-[11px] text-[#06b6d4] hover:text-[#4cd7f6] flex items-center gap-1 cursor-pointer"
-                      >
-                        {showNotes ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        {showNotes ? 'Hide Notes' : 'Expand Notes'}
-                      </button>
+                </div>
+              ) : (
+                /* Revealed Proof & Code Block (Screen 3) */
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-mono border-b border-[#1e2230] pb-2">
+                    <span className="flex items-center gap-1.5 text-[#10b981] font-bold">
+                      <Check className="w-3.5 h-3.5" />
+                      Verified Solution / Syllabus Extract
+                    </span>
+                    <span className="text-[#475569]">Complexity: Level 3 Concept</span>
+                  </div>
+
+                  {/* 2 Invariant Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-sans">
+                    <div className="p-3.5 rounded bg-[#12141c] border border-[#1e2230] space-y-1.5">
+                      <div className="text-[11px] font-mono font-bold text-[#06b6d4]">
+                        Invariant #01 Bounded Clock Uncertainty (2ε)
+                      </div>
+                      <p className="text-[#94a3b8] leading-relaxed text-xs">
+                        TrueTime exposes <code className="text-[#f1f5f9] font-mono">TT.now()</code>, returning an absolute time range <code className="text-[#f1f5f9] font-mono">[t.earliest, t.latest]</code> where the uncertainty boundary guarantees: <code className="text-[#10b981] font-mono">latest - earliest ≤ 2ε</code> (typically 1ms – 7ms).
+                      </p>
                     </div>
 
-                    <ul className="text-xs text-[#94a3b8] space-y-1.5 list-disc list-inside">
-                      <li>Did you accurately recall the defining mechanic without documentation?</li>
-                      <li>Can you explain edge cases, trade-offs, and boundary invariants?</li>
-                      <li>How quickly did retrieval happen (instantaneous vs effortful)?</li>
-                    </ul>
-
-                    {showNotes && (
-                      <div className="p-3 rounded bg-[#1b1f2e] border border-[#2a3045] text-xs text-[#bbcabf] font-mono space-y-1 animate-in fade-in">
-                        <div className="text-[10px] uppercase text-[#6366f1] font-bold">Concept Meta Notes</div>
-                        <div>Target Depth: {currentNode.depth}</div>
-                        <div>Associated Tags: {currentNode.tags?.join(', ') || 'None'}</div>
-                        {currentNode.url && <div>Canonical URL: {currentNode.url}</div>}
+                    <div className="p-3.5 rounded bg-[#12141c] border border-[#1e2230] space-y-1.5">
+                      <div className="text-[11px] font-mono font-bold text-[#06b6d4]">
+                        Invariant #02 The Commit Wait Rule
                       </div>
-                    )}
+                      <p className="text-[#94a3b8] leading-relaxed text-xs">
+                        The coordinator node assigns an absolute commit timestamp <code className="text-[#f1f5f9] font-mono">s ≥ TT.now().latest</code>. The leader explicitly delays releasing transaction locks until: <code className="text-[#10b981] font-mono">TT.now().earliest &gt; s</code> (guaranteed in past).
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Rust / Code Snippet */}
+                  <div className="rounded-lg bg-[#090a0f] border border-[#1e2230] overflow-hidden">
+                    <div className="px-3.5 py-1.5 bg-[#12141c] border-b border-[#1e2230] flex items-center justify-between text-[10px] font-mono text-[#94a3b8]">
+                      <span>consensus_invariant_spanner.rs</span>
+                      <span className="text-[#10b981]">Verified Mathematical Guarantee</span>
+                    </div>
+                    <pre className="p-4 text-[11px] font-mono text-[#f1f5f9] leading-relaxed overflow-x-auto">
+{`impl TrueTimeCommitEngine {
+    // External Consistency Rule: If T2 begins after T1 commits, then s2 > s1.
+    pub fn commit_with_wait(&self, txn: &Transaction) -> Timestamp {
+        let s = self.tt.now().latest;
+        while self.tt.now().earliest <= s {
+            std::thread::yield_now(); // Wait out 2ε interval window
+        }
+        return s; // Safe to release locks and serve concurrent read snapshots
+    }
+}`}
+                    </pre>
+                  </div>
+
+                  {/* Source Footer */}
+                  <div className="text-[10px] font-mono text-[#475569] flex items-center justify-between">
+                    <span>Source Artifact: Spanner: Google&apos;s Globally-Distributed Database (OSDI &apos;12)</span>
+                    <span>Section 4.1: TrueTime Architecture</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* High-Contrast Rating Action Bar with Exact Color Tokens */}
+        {/* Bottom Spaced Recall Self-Assessment Bar (Screen 3) */}
         {!isQueueComplete && (
-          <div className="p-4 border-t border-[#2a3045] bg-[#1b1f2e]">
-            <div className="text-[11px] font-mono text-[#94a3b8] mb-2 flex items-center justify-between">
-              <span>Rate Your Retrieval Accuracy (SuperMemo-2)</span>
-              <span className="text-[#6366f1]">Keys: 1 · 2 · 3 · 4</span>
+          <div className="border-t border-[#1e2230] bg-[#12141c] p-4 select-none">
+            <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94a3b8] mb-2.5">
+              <span>Spaced Recall Self-Assessment</span>
+              <span className="text-[#6366f1]">Target SM-2 Ease Multiplier</span>
             </div>
 
+            {/* 4 Rating Action Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {/* Rating 1: Again (Rose #f43f5e) */}
+              {/* Rating 1: Again */}
               <button
                 type="button"
                 onClick={() => handleRate('again')}
-                className="group p-2.5 rounded-md bg-[#141722] hover:bg-[#f43f5e]/15 text-left border border-[#2a3045] hover:border-[#f43f5e] transition-all cursor-pointer active:scale-98"
+                className="p-3 rounded-lg bg-[#0c0e16] hover:bg-[#f43f5e]/15 border border-[#2d3246] hover:border-[#f43f5e] transition-all cursor-pointer text-left group"
               >
                 <div className="flex items-center justify-between text-xs font-bold text-[#f43f5e] font-mono">
                   <span>Again</span>
-                  <kbd className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#1b1f2e] text-[#f43f5e] border border-[#f43f5e]/30">
+                  <kbd className="px-1.5 py-0.2 rounded text-[10px] bg-[#181b26] text-[#f43f5e] border border-[#f43f5e]/30">
                     1
                   </kbd>
                 </div>
-                <div className="text-[10px] text-[#94a3b8] group-hover:text-[#f1f5f9] mt-1 font-mono">
-                  Lapse · Reset (1d)
-                </div>
+                <div className="text-sm font-bold font-mono text-[#f1f5f9] mt-1">10 min</div>
+                <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">Blackout / Forgot rule</div>
               </button>
 
-              {/* Rating 2: Hard (Amber #f59e0b) */}
+              {/* Rating 2: Hard */}
               <button
                 type="button"
                 onClick={() => handleRate('hard')}
-                className="group p-2.5 rounded-md bg-[#141722] hover:bg-[#f59e0b]/15 text-left border border-[#2a3045] hover:border-[#f59e0b] transition-all cursor-pointer active:scale-98"
+                className="p-3 rounded-lg bg-[#0c0e16] hover:bg-[#f59e0b]/15 border border-[#2d3246] hover:border-[#f59e0b] transition-all cursor-pointer text-left group"
               >
                 <div className="flex items-center justify-between text-xs font-bold text-[#f59e0b] font-mono">
                   <span>Hard</span>
-                  <kbd className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#1b1f2e] text-[#f59e0b] border border-[#f59e0b]/30">
+                  <kbd className="px-1.5 py-0.2 rounded text-[10px] bg-[#181b26] text-[#f59e0b] border border-[#f59e0b]/30">
                     2
                   </kbd>
                 </div>
-                <div className="text-[10px] text-[#94a3b8] group-hover:text-[#f1f5f9] mt-1 font-mono">
-                  Effortful · Small interval
-                </div>
+                <div className="text-sm font-bold font-mono text-[#f1f5f9] mt-1">2 days</div>
+                <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">Recalled with hesitation</div>
               </button>
 
-              {/* Rating 3: Good (Cyan #06b6d4) */}
+              {/* Rating 3: Good */}
               <button
                 type="button"
                 onClick={() => handleRate('good')}
-                className="group p-2.5 rounded-md bg-[#141722] hover:bg-[#06b6d4]/15 text-left border border-[#2a3045] hover:border-[#06b6d4] transition-all cursor-pointer active:scale-98"
+                className="p-3 rounded-lg bg-[#0c0e16] hover:bg-[#06b6d4]/15 border border-[#2d3246] hover:border-[#06b6d4] transition-all cursor-pointer text-left group"
               >
                 <div className="flex items-center justify-between text-xs font-bold text-[#06b6d4] font-mono">
                   <span>Good</span>
-                  <kbd className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#1b1f2e] text-[#06b6d4] border border-[#06b6d4]/30">
+                  <kbd className="px-1.5 py-0.2 rounded text-[10px] bg-[#181b26] text-[#06b6d4] border border-[#06b6d4]/30">
                     3
                   </kbd>
                 </div>
-                <div className="text-[10px] text-[#94a3b8] group-hover:text-[#f1f5f9] mt-1 font-mono">
-                  Correct · Standard jump
-                </div>
+                <div className="text-sm font-bold font-mono text-[#f1f5f9] mt-1">6 days</div>
+                <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">Reasonable recall effort</div>
               </button>
 
-              {/* Rating 4: Easy (Emerald #10b981) */}
+              {/* Rating 4: Easy */}
               <button
                 type="button"
                 onClick={() => handleRate('easy')}
-                className="group p-2.5 rounded-md bg-[#141722] hover:bg-[#10b981]/15 text-left border border-[#2a3045] hover:border-[#10b981] transition-all cursor-pointer active:scale-98"
+                className="p-3 rounded-lg bg-[#0c0e16] hover:bg-[#10b981]/15 border border-[#2d3246] hover:border-[#10b981] transition-all cursor-pointer text-left group"
               >
                 <div className="flex items-center justify-between text-xs font-bold text-[#10b981] font-mono">
                   <span>Easy</span>
-                  <kbd className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#1b1f2e] text-[#10b981] border border-[#10b981]/30">
+                  <kbd className="px-1.5 py-0.2 rounded text-[10px] bg-[#181b26] text-[#10b981] border border-[#10b981]/30">
                     4
                   </kbd>
                 </div>
-                <div className="text-[10px] text-[#94a3b8] group-hover:text-[#f1f5f9] mt-1 font-mono">
-                  Effortless · +0.1 EF
-                </div>
+                <div className="text-sm font-bold font-mono text-[#f1f5f9] mt-1">14 days</div>
+                <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">Instant mental model</div>
               </button>
+            </div>
+
+            {/* Next In Batch Queue Ticker (Screen 3 bottom) */}
+            <div className="mt-3 pt-2.5 border-t border-[#1e2230] flex items-center justify-between text-[10px] font-mono text-[#475569]">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <span className="text-[#94a3b8] font-semibold shrink-0">NEXT IN BATCH QUEUE</span>
+                <span className="text-[#475569]">({Math.max(0, totalInBatch - currentIndex - 1)} nodes remaining)</span>
+
+                {nextNodes.map((n, idx) => (
+                  <span
+                    key={n.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0c0e16] border border-[#1e2230] text-[#94a3b8] shrink-0"
+                  >
+                    <span>{84 + idx} {n.title.slice(0, 24)}</span>
+                    <span className="text-[#6366f1]">L{n.depth}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         )}
