@@ -2,23 +2,25 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  GitBranch,
   Search,
   Upload,
   BookOpen,
   Check,
   UserPlus,
-  Users,
   PanelLeft,
-  ChevronDown,
+  Settings,
+  FolderGit2,
 } from 'lucide-react';
 import type { UserProfile } from '../types/user';
+import type { SyllabusRepo } from '../types/repo';
 
 interface TopNavbarProps {
   activeUser: UserProfile;
+  activeRepo: SyllabusRepo | null;
   users: UserProfile[];
   onSelectUser: (userId: string) => void;
   onOpenCreateUser: () => void;
+  onOpenProfileSettings: () => void;
   dueCount: number;
   completionPercent: number;
   onOpenImport: () => void;
@@ -31,9 +33,11 @@ interface TopNavbarProps {
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   activeUser,
+  activeRepo,
   users,
   onSelectUser,
   onOpenCreateUser,
+  onOpenProfileSettings,
   dueCount,
   completionPercent,
   onOpenImport,
@@ -74,7 +78,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
 
           <span className="font-bold text-[#f1f5f9] text-sm tracking-tight font-sans">
-            LearnTree
+            Syllabex
           </span>
           <span className="px-1 py-0.2 rounded text-[10px] font-mono font-semibold bg-[#181b26] text-[#6366f1] border border-[#2d3246]">
             v1.4
@@ -84,12 +88,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* Separator */}
         <span className="text-[#3c445c] hidden sm:inline">|</span>
 
-        {/* Breadcrumb Trail */}
+        {/* Breadcrumb Trail: Syllabi / [Active Repo Name] */}
         <div className="hidden md:flex items-center gap-1.5 text-[#94a3b8] font-mono text-[11px] truncate">
           <span>Syllabi</span>
           <span className="text-[#475569]">/</span>
-          <span className="text-[#f1f5f9] font-medium truncate">
-            {activeUser.focusArea}
+          <span className="text-[#f1f5f9] font-medium truncate flex items-center gap-1">
+            <FolderGit2 className="w-3 h-3 text-[#10b981]" />
+            {activeRepo?.name || 'General Curriculum'}
           </span>
         </div>
 
@@ -109,7 +114,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       {/* Right: Search + Action Buttons + Profile Switcher */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Search Bar with ⌘K Badge */}
-        <div className="relative hidden sm:block w-48 md:w-64">
+        <div className="relative hidden sm:block w-48 md:w-60">
           <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#475569]" />
           <input
             type="text"
@@ -149,26 +154,50 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </kbd>
         </button>
 
-        {/* User Profile Avatar Menu */}
+        {/* User Profile Avatar Dropdown */}
         <div className="relative ml-1" ref={profileMenuRef}>
           <button
             type="button"
             onClick={() => setIsProfileOpen((p) => !p)}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold text-[#090a0f] ring-1 ring-[#2d3246] hover:ring-[#10b981] transition-all cursor-pointer shadow-sm"
-            style={{ backgroundColor: activeUser.avatarColor }}
+            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full bg-[#141722] border border-[#2d3246] hover:border-[#10b981] transition-all cursor-pointer shadow-sm"
             title={`Account: ${activeUser.name}`}
           >
-            {activeUser.avatarInitials}
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold text-[#090a0f] shadow-sm shrink-0"
+              style={{ backgroundColor: activeUser.avatarColor }}
+            >
+              {activeUser.avatarInitials}
+            </div>
+            <span className="text-xs font-medium text-[#f1f5f9] max-w-[80px] truncate hidden md:inline">
+              {activeUser.name}
+            </span>
           </button>
 
           {isProfileOpen && (
             <div className="absolute right-0 top-full mt-2 w-64 rounded-lg bg-[#141722] border border-[#2d3246] shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-              <div className="p-3 border-b border-[#1e2230] bg-[#1a1d28]">
-                <div className="text-xs font-semibold text-[#f1f5f9]">{activeUser.name}</div>
-                <div className="text-[10px] font-mono text-[#94a3b8] truncate">{activeUser.focusArea}</div>
+              <div className="p-3 border-b border-[#1e2230] bg-[#1a1d28] flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-[#f1f5f9] truncate">{activeUser.name}</div>
+                  <div className="text-[10px] font-mono text-[#10b981] truncate">Active Student Account</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    onOpenProfileSettings();
+                  }}
+                  className="p-1 rounded text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#202433] transition-colors cursor-pointer"
+                  title="Profile Settings"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
               </div>
 
+              {/* Profiles list */}
               <div className="p-1 space-y-0.5 max-h-48 overflow-y-auto">
+                <div className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-[#475569]">
+                  Switch Account
+                </div>
                 {users.map((u) => (
                   <button
                     key={u.id}
@@ -197,14 +226,27 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 ))}
               </div>
 
-              <div className="p-1 border-t border-[#1e2230]">
+              {/* Footer Actions */}
+              <div className="p-1.5 border-t border-[#1e2230] space-y-1 bg-[#12141c]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    onOpenProfileSettings();
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#f1f5f9] hover:bg-[#181b26] cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-[#94a3b8]" />
+                  <span>Profile Settings & Backup</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setIsProfileOpen(false);
                     onOpenCreateUser();
                   }}
-                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>+ Add Student Profile</span>

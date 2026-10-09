@@ -6,20 +6,22 @@ import {
   Clock,
   Flame,
   Brain,
-  Sparkles,
-  ArrowUpRight,
+  FolderGit2,
 } from 'lucide-react';
 import type { DashboardMetrics } from '../types/syllabus';
 import type { UserProfile } from '../types/user';
+import type { SyllabusRepo } from '../types/repo';
 
 interface DashboardHeaderProps {
   metrics: DashboardMetrics;
   activeUser: UserProfile;
+  activeRepo: SyllabusRepo | null;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   metrics,
   activeUser,
+  activeRepo,
 }) => {
   const completionPercent =
     metrics.totalNodes > 0
@@ -31,26 +33,30 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     metrics.totalNodes - metrics.completedNodes - metrics.dueForReviewCount
   );
 
+  const repoTitle = activeRepo?.name || 'General Curriculum';
+  const repoCode = activeRepo?.code || 'SYS-601';
+
   return (
     <div className="space-y-4">
-      {/* Hero Syllabus Banner */}
+      {/* Hero Syllabus Banner (Screen 1) */}
       <div className="p-5 rounded-lg bg-[#12141c] border border-[#1e2230] shadow-sm relative overflow-hidden">
-        {/* Subtle ambient gradient */}
+        {/* Ambient Gradient Glow */}
         <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-[#10b981]/5 via-[#06b6d4]/5 to-transparent pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-[#181b26] text-[#6366f1] border border-[#2d3246] uppercase">
-                Active Syllabus SYS-601
+                ACTIVE SYLLABUS {repoCode}
               </span>
               <span className="text-xs font-mono text-[#94a3b8]">
                 Student: {activeUser.name}
               </span>
             </div>
 
-            <h1 className="text-2xl font-bold tracking-tight text-[#f1f5f9] font-sans">
-              {activeUser.focusArea}
+            <h1 className="text-2xl font-bold tracking-tight text-[#f1f5f9] font-sans flex items-center gap-2">
+              <FolderGit2 className="w-5 h-5 text-[#10b981] hidden sm:inline" />
+              <span>{repoTitle}</span>
             </h1>
           </div>
 
@@ -103,7 +109,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       </div>
 
-      {/* 4 Segmented KPI Cards */}
+      {/* 4 Segmented KPI Cards (Screen 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Nodes Completed */}
         <div className="p-3.5 rounded-lg bg-[#12141c] border border-[#1e2230] space-y-2">
@@ -119,7 +125,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
             {metrics.completedNodes} <span className="text-xs text-[#94a3b8] font-normal">/ {metrics.totalNodes}</span>
           </div>
-          {/* Segmented Progress Blocks */}
           <div className="flex gap-1 h-1">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
@@ -154,7 +159,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <div className="text-xl font-bold font-mono text-[#f59e0b] tabular-nums">
             {metrics.dueForReviewCount} <span className="text-xs text-[#94a3b8] font-normal">nodes</span>
           </div>
-          {/* Segmented Ticks */}
           <div className="flex gap-1 h-1">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
@@ -183,7 +187,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
             {metrics.streakDays} <span className="text-xs text-[#94a3b8] font-normal">Days</span>
           </div>
-          {/* Streak Ticks */}
           <div className="flex gap-1 h-1">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
@@ -212,7 +215,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <div className="text-xl font-bold font-mono text-[#f1f5f9] tabular-nums">
             {(metrics.retentionRate * 100).toFixed(1)}%
           </div>
-          {/* Retention Ticks */}
           <div className="flex gap-1 h-1">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div

@@ -7,20 +7,16 @@ import {
   FileCode2,
   Tag,
   Plus,
-  HardDrive,
   Settings,
-  Layers,
-  ChevronRight,
-  Database,
-  User,
+  FolderGit2,
 } from 'lucide-react';
-import type { UserProfile } from '../types/user';
+import type { SyllabusRepo } from '../types/repo';
 
 interface SidebarProps {
-  users: UserProfile[];
-  activeUser: UserProfile;
-  onSelectUser: (userId: string) => void;
-  onOpenCreateUser: () => void;
+  repos: SyllabusRepo[];
+  activeRepoId: string;
+  onSelectRepo: (repoId: string) => void;
+  onOpenCreateRepo: () => void;
   dueCount: number;
   masteredCount: number;
   totalCount: number;
@@ -29,10 +25,10 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  users,
-  activeUser,
-  onSelectUser,
-  onOpenCreateUser,
+  repos,
+  activeRepoId,
+  onSelectRepo,
+  onOpenCreateRepo,
   dueCount,
   masteredCount,
   totalCount,
@@ -131,57 +127,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* SYLLABI REPOS (Multi-User Curriculum Tracks) */}
+        {/* SYLLABI REPOS (Google Drive model: multiple syllabi per user) */}
         <div>
           <div className="px-2.5 pb-1.5 flex items-center justify-between text-[10px] font-mono font-semibold tracking-wider text-[#475569] uppercase">
             <span>Syllabi Repos</span>
             <button
               type="button"
-              onClick={onOpenCreateUser}
-              className="p-0.5 hover:text-[#f1f5f9] transition-colors rounded hover:bg-[#1e2230]"
-              title="Add Syllabus Repo / Student Track"
+              onClick={onOpenCreateRepo}
+              className="p-0.5 hover:text-[#f1f5f9] transition-colors rounded hover:bg-[#1e2230] cursor-pointer"
+              title="Create New Syllabus Repo in your drive"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3 h-3 text-[#10b981]" />
             </button>
           </div>
 
           <div className="space-y-0.5">
-            {users.map((user) => {
-              const isActive = user.id === activeUser.id;
-              // Synthetic completion percentage preview per repo
-              const percentage =
-                user.id === 'user_alex'
-                  ? '68%'
-                  : user.id === 'user_elena'
-                  ? '42%'
-                  : user.id === 'user_marcus'
-                  ? '89%'
-                  : '15%';
+            {repos.map((repo) => {
+              const isActive = repo.id === activeRepoId;
+              const flat = repo.nodes ? repo.nodes.reduce((acc, c) => acc + 1 + (c.children?.length || 0), 0) : 0;
+              const mastered = repo.nodes
+                ? repo.nodes.filter((n) => n.status === 'mastered').length
+                : 0;
+              const pct = flat > 0 ? Math.round((mastered / flat) * 100) : 0;
 
               return (
                 <button
-                  key={user.id}
+                  key={repo.id}
                   type="button"
-                  onClick={() => onSelectUser(user.id)}
+                  onClick={() => onSelectRepo(repo.id)}
                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs transition-colors cursor-pointer text-left ${
                     isActive
                       ? 'bg-[#181b26] text-[#f1f5f9] font-medium border-l-2 border-[#10b981]'
                       : 'hover:bg-[#141722] hover:text-[#f1f5f9]'
                   }`}
+                  title={`${repo.name} (${repo.code})`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ backgroundColor: user.avatarColor }}
-                    />
-                    <span className="truncate">{user.focusArea}</span>
+                    <FolderGit2 className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#10b981]' : 'text-[#475569]'}`} />
+                    <span className="truncate">{repo.name}</span>
                   </div>
                   <span
                     className={`text-[10px] font-mono shrink-0 ml-1.5 ${
                       isActive ? 'text-[#10b981] font-semibold' : 'text-[#475569]'
                     }`}
                   >
-                    {percentage}
+                    {pct}%
                   </span>
                 </button>
               );
@@ -201,13 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div className="flex items-center justify-between text-[#475569]">
           <span>24.8 MB / 500 MB</span>
-          <button
-            type="button"
-            className="hover:text-[#94a3b8] transition-colors cursor-pointer flex items-center gap-1"
-          >
-            <Settings className="w-2.5 h-2.5" />
-            Settings
-          </button>
+          <span className="text-[#94a3b8]">Offline Ready</span>
         </div>
       </div>
     </aside>
