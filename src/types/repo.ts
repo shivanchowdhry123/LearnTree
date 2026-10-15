@@ -8,4 +8,16 @@ export interface SyllabusRepo {
   nodes: SyllabusNode[];
   createdAt: string;
   updatedAt: string;
+  // Multi-user & sharing metadata
+  isPublic?: boolean;
+  shareSlug?: string;
+  description?: string;
+  category?: string;
+  // Denormalized metrics for instant dashboard queries
+  dueReviewsCount?: number;
+  nextDueDate?: string | null;
+  masteredCount?: number;
+  totalNodesCount?: number;
+  revision?: number;
+  syncedAt?: string;
 }

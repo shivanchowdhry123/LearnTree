@@ -403,6 +403,28 @@ export function updateRepoNodes(userId: string, repoId: string, nodes: SyllabusN
   }
 }
 
+export function updateUserRepoMeta(
+  userId: string,
+  repoId: string,
+  updates: { name?: string; code?: string }
+): SyllabusRepo | null {
+  const repos = loadUserRepos(userId);
+  const index = repos.findIndex((r) => r.id === repoId);
+  if (index === -1) return null;
+
+  const current = repos[index];
+  const updated: SyllabusRepo = {
+    ...current,
+    name: updates.name !== undefined ? updates.name.trim() || current.name : current.name,
+    code: updates.code !== undefined ? updates.code.trim().toUpperCase() || current.code : current.code,
+    updatedAt: new Date().toISOString(),
+  };
+
+  repos[index] = updated;
+  saveUserRepos(userId, repos);
+  return updated;
+}
+
 export function deleteUserRepo(userId: string, repoId: string): { remainingRepos: SyllabusRepo[]; nextActiveId: string } {
   const repos = loadUserRepos(userId);
   const filtered = repos.filter((r) => r.id !== repoId);
@@ -467,6 +489,75 @@ export function saveUserLastStudyDate(userId: string, dateStr: string): void {
   }
 }
 
+export function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+export function loadUserDailyTarget(userId: string): number {
+  if (typeof window === 'undefined') return 30;
+  const key = `learntree_user_${userId}_daily_target`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  if (userId === 'user_alex') return 30;
+  if (userId === 'user_elena') return 25;
+  if (userId === 'user_marcus') return 45;
+  return 30;
+}
+
+export function saveUserDailyTarget(userId: string, targetMinutes: number): void {
+  if (typeof window === 'undefined') return;
+  const key = `learntree_user_${userId}_daily_target`;
+  try {
+    localStorage.setItem(key, Math.max(1, targetMinutes).toString());
+  } catch {
+    // ignore
+  }
+}
+
+export function loadUserTodayStudyMinutes(userId: string): number {
+  if (typeof window === 'undefined') return 18;
+  const todayStr = getTodayDateString();
+  const key = `learntree_user_${userId}_study_minutes_${todayStr}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw !== null) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  if (userId === 'user_alex') return 18;
+  if (userId === 'user_elena') return 25;
+  if (userId === 'user_marcus') return 30;
+  return 0;
+}
+
+export function saveUserTodayStudyMinutes(userId: string, minutes: number): void {
+  if (typeof window === 'undefined') return;
+  const todayStr = getTodayDateString();
+  const key = `learntree_user_${userId}_study_minutes_${todayStr}`;
+  try {
+    localStorage.setItem(key, Math.max(0, minutes).toString());
+  } catch {
+    // ignore
+  }
+}
+
+export function addStudyMinutes(userId: string, deltaMinutes: number): number {
+  const current = loadUserTodayStudyMinutes(userId);
+  const next = Math.max(0, current + deltaMinutes);
+  saveUserTodayStudyMinutes(userId, next);
+  return next;
+}
+
 // Export Profile & Specific Syllabus Data as Downloadable JSON
 export function exportUserDataAsJSON(userId: string): string {
   const users = loadUserProfiles();
@@ -474,6 +565,8 @@ export function exportUserDataAsJSON(userId: string): string {
   const repos = loadUserRepos(userId);
   const streak = loadUserStreak(userId);
   const lastStudyDate = loadUserLastStudyDate(userId);
+  const dailyTarget = loadUserDailyTarget(userId);
+  const todayStudyMinutes = loadUserTodayStudyMinutes(userId);
 
   const payload = {
     app: 'Syllabex',
@@ -482,6 +575,11 @@ export function exportUserDataAsJSON(userId: string): string {
     profile: user,
     streak,
     lastStudyDate,
+    dailyStudyGoal: {
+      targetMinutes: dailyTarget,
+      todayMinutes: todayStudyMinutes,
+      isGoalMet: todayStudyMinutes >= dailyTarget,
+    },
     repositories: repos,
   };
 

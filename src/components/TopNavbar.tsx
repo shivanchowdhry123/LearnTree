@@ -10,9 +10,14 @@ import {
   PanelLeft,
   Settings,
   FolderGit2,
+  Share2,
+  LogIn,
+  LogOut,
+  Globe,
 } from 'lucide-react';
 import type { UserProfile } from '../types/user';
 import type { SyllabusRepo } from '../types/repo';
+import { SyncStatusBadge } from './SyncStatusBadge';
 
 interface TopNavbarProps {
   activeUser: UserProfile;
@@ -29,6 +34,10 @@ interface TopNavbarProps {
   onSearchChange: (q: string) => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onOpenAuthModal?: (mode: 'login' | 'register') => void;
+  onOpenShareModal?: () => void;
+  onLogout?: () => void;
+  isAuthenticated?: boolean;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
@@ -46,6 +55,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onSearchChange,
   isSidebarOpen,
   onToggleSidebar,
+  onOpenAuthModal,
+  onOpenShareModal,
+  onLogout,
+  isAuthenticated = false,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -104,10 +117,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <span className="text-[9px] font-normal uppercase opacity-90">Mastered</span>
         </div>
 
-        {/* Local-First Sync Indicator */}
-        <div className="hidden xl:flex items-center gap-1.5 text-[11px] font-mono text-[#94a3b8]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
-          <span>Local-First (Synced 2s ago)</span>
+        {/* PocketBase Cloud & Local-First Sync Badge */}
+        <div className="hidden sm:flex items-center">
+          <SyncStatusBadge />
         </div>
       </div>
 
@@ -128,14 +140,36 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </kbd>
         </div>
 
+        {/* Share Syllabus Button */}
+        {activeRepo && onOpenShareModal && (
+          <button
+            type="button"
+            onClick={onOpenShareModal}
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded border transition-colors cursor-pointer text-xs font-mono font-medium shadow-sm shrink-0 ${
+              activeRepo.isPublic
+                ? 'bg-[#10b981]/15 border-[#10b981]/40 text-[#10b981] hover:bg-[#10b981]/25'
+                : 'bg-[#181b26] hover:bg-[#202433] text-[#f1f5f9] border-[#2d3246] hover:border-[#06b6d4]'
+            }`}
+            title="Share Syllabus (Public Link & Clone)"
+          >
+            {activeRepo.isPublic ? (
+              <Globe className="w-3.5 h-3.5 text-[#10b981]" />
+            ) : (
+              <Share2 className="w-3.5 h-3.5 text-[#06b6d4]" />
+            )}
+            <span className="hidden xs:inline">{activeRepo.isPublic ? 'Public' : 'Share'}</span>
+          </button>
+        )}
+
         {/* Import Syllabus with ⌘I */}
         <button
           type="button"
           onClick={onOpenImport}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#181b26] hover:bg-[#202433] text-[#f1f5f9] border border-[#2d3246] hover:border-[#94a3b8] transition-colors cursor-pointer text-xs font-mono font-medium shadow-sm"
+          className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[#181b26] hover:bg-[#202433] text-[#f1f5f9] border border-[#2d3246] hover:border-[#94a3b8] transition-colors cursor-pointer text-xs font-mono font-medium shadow-sm shrink-0"
+          title="Import Syllabus (⌘I)"
         >
-          <Upload className="w-3 h-3 text-[#06b6d4]" />
-          <span>Import</span>
+          <Upload className="w-3.5 h-3.5 text-[#06b6d4]" />
+          <span className="hidden xs:inline">Import</span>
           <kbd className="hidden md:inline px-1 py-0.2 rounded text-[9px] font-mono bg-[#12141c] text-[#475569] border border-[#2d3246]">
             ⌘I
           </kbd>
@@ -145,14 +179,29 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         <button
           type="button"
           onClick={onOpenReview}
-          className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-mono font-bold text-xs transition-colors cursor-pointer shadow-sm"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-mono font-bold text-xs transition-colors cursor-pointer shadow-sm shrink-0"
+          title="Review Due Cards (Space)"
         >
-          <BookOpen className="w-3 h-3" />
-          <span>Review Due: {dueCount}</span>
-          <kbd className="px-1 py-0.2 rounded text-[9px] font-mono bg-[#090a0f]/80 text-[#10b981]">
+          <BookOpen className="w-3.5 h-3.5" />
+          <span className="hidden xs:inline">Review: </span>
+          <span>{dueCount}</span>
+          <kbd className="hidden sm:inline px-1 py-0.2 rounded text-[9px] font-mono bg-[#090a0f]/80 text-[#10b981]">
             Space
           </kbd>
         </button>
+
+        {/* Quick Sign In button if not logged in */}
+        {!isAuthenticated && onOpenAuthModal && (
+          <button
+            type="button"
+            onClick={() => onOpenAuthModal('login')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-mono font-semibold transition-colors cursor-pointer shadow-sm shrink-0"
+            title="Sign in with PocketBase"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sign In</span>
+          </button>
+        )}
 
         {/* User Profile Avatar Dropdown */}
         <div className="relative ml-1" ref={profileMenuRef}>
@@ -174,11 +223,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
 
           {isProfileOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 rounded-lg bg-[#141722] border border-[#2d3246] shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 top-full mt-2 w-72 rounded-lg bg-[#141722] border border-[#2d3246] shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
               <div className="p-3 border-b border-[#1e2230] bg-[#1a1d28] flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-[#f1f5f9] truncate">{activeUser.name}</div>
-                  <div className="text-[10px] font-mono text-[#10b981] truncate">Active Student Account</div>
+                  <div className="text-[10px] font-mono text-[#10b981] truncate">
+                    {activeUser.email || (activeUser.isDemo ? 'Demo Local Mode' : 'Cloud Synchronized')}
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -228,6 +279,48 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
               {/* Footer Actions */}
               <div className="p-1.5 border-t border-[#1e2230] space-y-1 bg-[#12141c]">
+                {activeRepo && onOpenShareModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onOpenShareModal();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-[#06b6d4]" />
+                    <span>Share Active Syllabus</span>
+                  </button>
+                )}
+
+                {!isAuthenticated && onOpenAuthModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onOpenAuthModal('login');
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#6366f1] hover:bg-[#181b26] cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Connect PocketBase Account</span>
+                  </button>
+                )}
+
+                {isAuthenticated && onLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#ef4444] hover:bg-[#181b26] cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-[#ef4444]" />
+                    <span>Sign Out</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -246,10 +339,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                     setIsProfileOpen(false);
                     onOpenCreateUser();
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#94a3b8] hover:bg-[#181b26] cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>+ Add Student Profile</span>
+                  <span>+ Add Demo Profile</span>
                 </button>
               </div>
             </div>

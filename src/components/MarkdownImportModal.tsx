@@ -130,32 +130,32 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#090a0f]/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="w-full max-w-5xl h-[88vh] flex flex-col bg-[#0c0e16] border border-[#2d3246] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-6 bg-[#090a0f]/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="w-full max-w-5xl h-full sm:h-[88vh] flex flex-col bg-[#0c0e16] border-0 sm:border border-[#2d3246] rounded-none sm:rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] overflow-hidden">
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#1e2230] bg-[#12141c]">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-[#1e2230] bg-[#12141c] flex-wrap gap-2">
+          <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold text-[#f1f5f9] tracking-tight font-sans">
-              Import Syllabus...
+              Import Syllabus
             </h2>
             <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-[#181b26] text-[#06b6d4] border border-[#2d3246]">
-              PARSER v2.4
+              PARSER
             </span>
             <span className="text-[11px] font-mono text-[#94a3b8] hidden md:inline">
-              Paste any nested outline or syllabus document
+              Paste outline or markdown
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Preset Selector */}
             <select
               value={selectedPreset}
               onChange={(e) => handleSelectPreset(e.target.value)}
-              className="bg-[#181b26] border border-[#2d3246] text-[#f1f5f9] text-xs font-mono rounded px-2.5 py-1 focus:outline-none focus:border-[#06b6d4] cursor-pointer"
+              className="bg-[#181b26] border border-[#2d3246] text-[#f1f5f9] text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-[#06b6d4] cursor-pointer max-w-[140px] sm:max-w-none"
             >
               {PRESETS.map((p) => (
                 <option key={p.name} value={p.name} className="bg-[#12141c]">
-                  Preset: {p.name}
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -165,7 +165,7 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
               onClick={onClose}
               className="text-xs font-mono text-[#94a3b8] hover:text-[#f1f5f9] px-2 py-1 rounded hover:bg-[#181b26] cursor-pointer"
             >
-              Cancel <kbd className="text-[10px] text-[#475569]">Esc</kbd>
+              Cancel
             </button>
 
             <button
@@ -174,10 +174,7 @@ export const MarkdownImportModal: React.FC<MarkdownImportModalProps> = ({
               disabled={parsedNodes.length === 0}
               className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-mono font-bold text-xs transition-colors cursor-pointer disabled:opacity-40"
             >
-              <span>Import {flatNodes.length} Nodes</span>
-              <kbd className="px-1 py-0.2 rounded text-[9px] bg-[#090a0f]/80 text-[#10b981]">
-                ⌘Enter
-              </kbd>
+              <span>Import ({flatNodes.length})</span>
             </button>
           </div>
         </div>

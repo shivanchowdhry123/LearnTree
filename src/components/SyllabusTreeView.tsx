@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -12,15 +12,24 @@ import {
   Sparkles,
   MoreHorizontal,
   Plus,
-  BookOpen,
+  Edit2,
+  Trash2,
+  Calendar,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import type { SyllabusNode, SyllabusNodeStatus, SM2State } from '../types/syllabus';
 
 interface SyllabusTreeViewProps {
   nodes: SyllabusNode[];
   onNodeStatusChange: (id: string, status: SyllabusNodeStatus) => void;
-  onNodeToggleExpand?: (id: string) => void;
+  onEditNode: (node: SyllabusNode) => void;
+  onAddChildNode: (parentId: string) => void;
+  onDeleteNode: (nodeId: string) => void;
+  onMarkDueNow: (nodeId: string) => void;
+  onAppendRootSection: () => void;
   onOpenReview?: () => void;
+  onSelectTag?: (tag: string) => void;
 }
 
 const NEXT_STATUS: Record<SyllabusNodeStatus, SyllabusNodeStatus> = {
@@ -54,8 +63,13 @@ function formatSM2Interval(sm2State: SM2State): { label: string; isDue: boolean;
 export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
   nodes,
   onNodeStatusChange,
-  onNodeToggleExpand,
+  onEditNode,
+  onAddChildNode,
+  onDeleteNode,
+  onMarkDueNow,
+  onAppendRootSection,
   onOpenReview,
+  onSelectTag,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(() => {
     const map: Record<string, boolean> = {};
@@ -69,10 +83,26 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
     return map;
   });
 
-  const handleToggle = (id: string) => {
-    if (onNodeToggleExpand) {
-      onNodeToggleExpand(id);
+  const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuNodeId(null);
+        setConfirmDeleteId(null);
+      }
     }
+    if (activeMenuNodeId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeMenuNodeId]);
+
+  const handleToggle = (id: string) => {
     setInternalExpanded((prev) => ({
       ...prev,
       [id]: !(prev[id] ?? true),
@@ -85,6 +115,7 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
       const hasChildren = node.children && node.children.length > 0;
       const isRoot = depth === 0;
       const sm2Info = formatSM2Interval(node.sm2State);
+      const isMenuOpen = activeMenuNodeId === node.id;
 
       // Compute cluster stats for root nodes
       const totalChildren = node.children ? node.children.length : 0;
@@ -101,7 +132,7 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
       return (
         <React.Fragment key={node.id}>
           <div
-            className={`flex items-center px-3 py-2 text-xs border-b border-[#1e2230] hover:bg-[#151824] transition-colors group select-none ${
+            className={`flex items-center px-3 py-2 text-xs border-b border-[#1e2230] hover:bg-[#151824] transition-colors group select-none relative ${
               isRoot ? 'bg-[#12141c] font-medium' : 'bg-[#0e1017]'
             }`}
           >
@@ -153,8 +184,8 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
               {/* Title & Cluster Badges */}
               <div className="min-w-0 flex items-center gap-2 flex-wrap sm:flex-nowrap">
                 <span
-                  onClick={() => hasChildren && handleToggle(node.id)}
-                  className={`truncate font-sans ${
+                  onClick={() => onEditNode(node)}
+                  className={`truncate font-sans hover:underline cursor-pointer ${
                     isRoot
                       ? 'font-bold text-[#f1f5f9] text-[13px]'
                       : node.status === 'mastered'
@@ -162,7 +193,8 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
                       : node.status === 'in_progress'
                       ? 'text-[#f1f5f9] font-medium'
                       : 'text-[#e1e1ed]'
-                  } ${hasChildren ? 'cursor-pointer' : ''}`}
+                  }`}
+                  title="Click to edit concept details"
                 >
                   {node.title}
                 </span>
@@ -195,12 +227,15 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
             <div className="hidden md:flex items-center gap-1.5 w-36 shrink-0 truncate">
               {node.tags && node.tags.length > 0 ? (
                 node.tags.slice(0, 2).map((t) => (
-                  <span
+                  <button
                     key={t}
-                    className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] border border-[#2d3246] text-[#94a3b8]"
+                    type="button"
+                    onClick={() => onSelectTag && onSelectTag(t)}
+                    className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181b26] border border-[#2d3246] text-[#94a3b8] hover:text-[#06b6d4] hover:border-[#06b6d4]/40 transition-colors cursor-pointer"
+                    title={`Filter by #${t}`}
                   >
                     #{t}
-                  </span>
+                  </button>
                 ))
               ) : isRoot ? (
                 <span className="text-[10px] font-mono text-[#475569]">
@@ -233,18 +268,27 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
             {/* SM-2 SPACED RECALL Column */}
             <div className="w-32 shrink-0 flex items-center justify-end font-mono text-[11px] tabular-nums">
               {sm2Info.isDue ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/40 shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+                <button
+                  type="button"
+                  onClick={() => onOpenReview && onOpenReview()}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#f59e0b] border border-[#f59e0b]/40 shadow-[0_0_8px_rgba(245,158,11,0.2)] cursor-pointer transition-colors"
+                  title="Click to review due cards now"
+                >
                   <Clock className="w-2.5 h-2.5" />
                   {sm2Info.label}
-                </span>
+                </button>
               ) : isRoot && clusterPercent === 100 ? (
                 <span className="text-[#10b981] font-semibold text-[10px]">
                   All Retained
                 </span>
               ) : isRoot && sm2Info.isDue ? (
-                <span className="text-[#f59e0b] font-semibold text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onOpenReview && onOpenReview()}
+                  className="text-[#f59e0b] hover:underline font-semibold text-[10px] cursor-pointer"
+                >
                   Requires Review
-                </span>
+                </button>
               ) : isRoot && clusterPercent === 0 ? (
                 <span className="text-[#475569] text-[10px]">Queue Idle</span>
               ) : (
@@ -254,15 +298,93 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
               )}
             </div>
 
-            {/* ACTIONS Column */}
-            <div className="w-8 shrink-0 flex items-center justify-end">
+            {/* ACTIONS Column (Interactive Dropdown Menu) */}
+            <div className="w-8 shrink-0 flex items-center justify-end relative">
               <button
                 type="button"
-                className="p-1 rounded text-[#475569] hover:text-[#f1f5f9] hover:bg-[#181b26] transition-colors cursor-pointer"
-                title="Node actions"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenuNodeId(isMenuOpen ? null : node.id);
+                }}
+                className={`p-1 rounded transition-colors cursor-pointer ${
+                  isMenuOpen
+                    ? 'text-[#f1f5f9] bg-[#181b26]'
+                    : 'text-[#475569] hover:text-[#f1f5f9] hover:bg-[#181b26]'
+                }`}
+                title="Node actions menu"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
+
+              {/* Action Context Popover */}
+              {isMenuOpen && (
+                <div
+                  ref={menuRef}
+                  className="absolute right-0 top-full mt-1 w-48 rounded-lg bg-[#141722] border border-[#2d3246] shadow-[0_16px_40px_rgba(0,0,0,0.9)] z-50 py-1 font-mono text-xs text-[#f1f5f9] animate-in fade-in zoom-in-95 duration-100"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenuNodeId(null);
+                      onEditNode(node);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[#1b1f2e] text-[#f1f5f9] cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-[#06b6d4]" />
+                    <span>Edit Details</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenuNodeId(null);
+                      onAddChildNode(node.id);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[#1b1f2e] text-[#f1f5f9] cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[#10b981]" />
+                    <span>Add Child Node</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMenuNodeId(null);
+                      onMarkDueNow(node.id);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[#1b1f2e] text-[#f59e0b] cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[#f59e0b]" />
+                    <span>Schedule Due Today</span>
+                  </button>
+
+                  <div className="my-1 border-t border-[#1e2230]" />
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirmDeleteId === node.id) {
+                        setActiveMenuNodeId(null);
+                        setConfirmDeleteId(null);
+                        onDeleteNode(node.id);
+                      } else {
+                        setConfirmDeleteId(node.id);
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left cursor-pointer transition-colors ${
+                      confirmDeleteId === node.id
+                        ? 'bg-[#f43f5e] text-[#090a0f] font-bold'
+                        : 'hover:bg-[#f43f5e]/15 text-[#f43f5e]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{confirmDeleteId === node.id ? 'Confirm Delete?' : 'Delete Node'}</span>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -290,8 +412,16 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
       {/* Table Body Rows */}
       <div className="divide-y divide-[#1e2230]/40">
         {nodes.length === 0 ? (
-          <div className="p-8 text-center text-xs font-mono text-[#94a3b8]">
-            No syllabus vertices found. Click &quot;Import&quot; or &quot;+ Add Node&quot; to begin.
+          <div className="p-8 text-center text-xs font-mono text-[#94a3b8] space-y-2">
+            <div>No syllabus vertices found in this repository.</div>
+            <button
+              type="button"
+              onClick={onAppendRootSection}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#10b981] hover:bg-[#059669] text-[#090a0f] font-bold text-xs cursor-pointer shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create First Root Section</span>
+            </button>
           </div>
         ) : (
           renderNodeRows(nodes, 0)
@@ -302,15 +432,10 @@ export const SyllabusTreeView: React.FC<SyllabusTreeViewProps> = ({
       <div className="p-2.5 px-4 bg-[#090a0f] border-t border-[#1e2230] flex items-center justify-between text-[11px] font-mono text-[#475569]">
         <button
           type="button"
-          onClick={() => {
-            const title = prompt('Enter Root Cluster / Module Title:');
-            if (title) {
-              // App handles creation or prompt
-            }
-          }}
-          className="flex items-center gap-1.5 text-[#06b6d4] hover:text-[#4cd7f6] transition-colors cursor-pointer font-medium"
+          onClick={onAppendRootSection}
+          className="flex items-center gap-1.5 text-[#06b6d4] hover:text-[#4cd7f6] transition-colors cursor-pointer font-medium hover:bg-[#141722] px-2 py-1 rounded"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-3.5 h-3.5" />
           <span>Append Root Section (Level 0)</span>
           <kbd className="px-1 py-0.2 rounded text-[9px] bg-[#181b26] text-[#475569] border border-[#2d3246]">
             ⌘+Enter

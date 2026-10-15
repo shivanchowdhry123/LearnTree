@@ -112,3 +112,12 @@ export function calculateNextReview(
     nextReviewAt: nextReviewTimestamp,
   };
 }
+
+/**
+ * Checks if a given syllabus node or SM2 state is due for review today.
+ */
+export function isDueForReview(node: { sm2State: SM2State; status?: string }): boolean {
+  if (node.status === 'unstarted') return false;
+  if (!node.sm2State.nextReviewAt) return true;
+  return new Date(node.sm2State.nextReviewAt).getTime() <= Date.now();
+}

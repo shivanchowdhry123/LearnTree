@@ -162,8 +162,8 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
   const nextNodes = dueNodes.slice(currentIndex + 1, currentIndex + 4);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#090a0f]/90 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl h-[92vh] bg-[#0c0e16] border border-[#2d3246] rounded-xl shadow-[0_24px_64px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-5 bg-[#090a0f]/90 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl h-full sm:h-[92vh] bg-[#0c0e16] border-0 sm:border border-[#2d3246] rounded-none sm:rounded-xl shadow-[0_24px_64px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col">
         {/* Top Queue Sequence Bar (Screen 3) */}
         <div className="px-5 py-3 border-b border-[#1e2230] bg-[#12141c] flex items-center justify-between text-xs select-none">
           {/* Left: Card Sequence Number */}
@@ -463,13 +463,22 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({
                 <span className="text-[#475569]">({Math.max(0, totalInBatch - currentIndex - 1)} nodes remaining)</span>
 
                 {nextNodes.map((n, idx) => (
-                  <span
+                  <button
                     key={n.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0c0e16] border border-[#1e2230] text-[#94a3b8] shrink-0"
+                    type="button"
+                    onClick={() => {
+                      const targetIndex = dueNodes.findIndex((x) => x.id === n.id);
+                      if (targetIndex !== -1) {
+                        setCurrentIndex(targetIndex);
+                        setIsRevealed(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0c0e16] hover:bg-[#181b26] border border-[#1e2230] hover:border-[#6366f1]/40 text-[#94a3b8] hover:text-[#f1f5f9] shrink-0 cursor-pointer transition-colors"
+                    title={`Jump to ${n.title}`}
                   >
                     <span>{84 + idx} {n.title.slice(0, 24)}</span>
                     <span className="text-[#6366f1]">L{n.depth}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>
