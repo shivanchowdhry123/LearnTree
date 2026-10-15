@@ -14,6 +14,7 @@ export const INITIAL_USER_PROFILES: UserProfile[] = [
     avatarInitials: 'AR',
     focusArea: 'Distributed Systems & Cloud',
     createdAt: '2026-09-15T08:00:00.000Z',
+    isDemo: true,
   },
   {
     id: 'user_elena',
@@ -22,6 +23,7 @@ export const INITIAL_USER_PROFILES: UserProfile[] = [
     avatarInitials: 'ER',
     focusArea: 'Full-Stack & React 19',
     createdAt: '2026-09-20T10:30:00.000Z',
+    isDemo: true,
   },
   {
     id: 'user_marcus',
@@ -30,6 +32,7 @@ export const INITIAL_USER_PROFILES: UserProfile[] = [
     avatarInitials: 'MC',
     focusArea: 'Systems & Compilers',
     createdAt: '2026-09-28T14:15:00.000Z',
+    isDemo: true,
   },
 ];
 

@@ -190,16 +190,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </kbd>
         </button>
 
-        {/* Quick Sign In button if not logged in */}
+        {/* Quick Sign In / Cloud Sync button if not logged in */}
         {!isAuthenticated && onOpenAuthModal && (
           <button
             type="button"
             onClick={() => onOpenAuthModal('login')}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-mono font-semibold transition-colors cursor-pointer shadow-sm shrink-0"
-            title="Sign in with PocketBase"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#6366f1]/15 hover:bg-[#6366f1]/25 text-[#a5b4fc] hover:text-white border border-[#6366f1]/40 hover:border-[#6366f1] text-xs font-mono font-medium transition-all cursor-pointer shadow-sm shrink-0"
+            title="Connect to PocketBase cloud account to sync syllabi across devices"
           >
-            <LogIn className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sign In</span>
+            <LogIn className="w-3.5 h-3.5 text-[#818cf8]" />
+            <span className="hidden sm:inline">Cloud Sync</span>
+            <span className="hidden lg:inline text-[10px] text-[#818cf8] font-normal">• Sign In</span>
           </button>
         )}
 
@@ -208,27 +209,68 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <button
             type="button"
             onClick={() => setIsProfileOpen((p) => !p)}
-            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full bg-[#141722] border border-[#2d3246] hover:border-[#10b981] transition-all cursor-pointer shadow-sm"
-            title={`Account: ${activeUser.name}`}
+            className={`flex items-center gap-1.5 sm:gap-2 p-1 pl-1.5 pr-2 rounded-full bg-[#141722] border transition-all cursor-pointer shadow-sm ${
+              isAuthenticated
+                ? 'border-[#10b981]/50 hover:border-[#10b981]'
+                : 'border-[#2d3246] hover:border-[#f59e0b]/50'
+            }`}
+            title={
+              isAuthenticated
+                ? `Cloud Account: ${activeUser.name} (${activeUser.email || 'Synced'})`
+                : `Local Guest Workspace: ${activeUser.name} (Offline / Demo Mode)`
+            }
           >
-            <div
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold text-[#090a0f] shadow-sm shrink-0"
-              style={{ backgroundColor: activeUser.avatarColor }}
-            >
-              {activeUser.avatarInitials}
+            <div className="relative">
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold text-[#090a0f] shadow-sm shrink-0"
+                style={{ backgroundColor: activeUser.avatarColor }}
+              >
+                {activeUser.avatarInitials}
+              </div>
+              {/* Online / local indicator dot */}
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#141722] ${
+                  isAuthenticated ? 'bg-[#10b981]' : 'bg-[#f59e0b]'
+                }`}
+              />
             </div>
+
             <span className="text-xs font-medium text-[#f1f5f9] max-w-[80px] truncate hidden md:inline">
               {activeUser.name}
             </span>
+
+            {/* Clear Mode Badge: Demo if local offline, Cloud if authenticated */}
+            {!isAuthenticated ? (
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase bg-[#f59e0b]/15 text-[#f59e0b] border border-[#f59e0b]/30">
+                Demo
+              </span>
+            ) : (
+              <span className="hidden xl:inline px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
+                Cloud
+              </span>
+            )}
           </button>
 
           {isProfileOpen && (
             <div className="absolute right-0 top-full mt-2 w-72 rounded-lg bg-[#141722] border border-[#2d3246] shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
               <div className="p-3 border-b border-[#1e2230] bg-[#1a1d28] flex items-center justify-between">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[#f1f5f9] truncate">{activeUser.name}</div>
-                  <div className="text-[10px] font-mono text-[#10b981] truncate">
-                    {activeUser.email || (activeUser.isDemo ? 'Demo Local Mode' : 'Cloud Synchronized')}
+                  <div className="text-xs font-semibold text-[#f1f5f9] truncate flex items-center gap-1.5">
+                    <span>{activeUser.name}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase ${
+                        isAuthenticated
+                          ? 'bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30'
+                          : 'bg-[#f59e0b]/15 text-[#f59e0b] border border-[#f59e0b]/30'
+                      }`}
+                    >
+                      {isAuthenticated ? 'Cloud Account' : 'Demo Workspace'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-[#94a3b8] truncate">
+                    {isAuthenticated
+                      ? activeUser.email || 'PocketBase Cloud Synchronized'
+                      : 'Local storage only • Not synced to cloud'}
                   </div>
                 </div>
                 <button
@@ -294,17 +336,22 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 )}
 
                 {!isAuthenticated && onOpenAuthModal && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      onOpenAuthModal('login');
-                    }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#6366f1] hover:bg-[#181b26] cursor-pointer"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Connect PocketBase Account</span>
-                  </button>
+                  <div className="p-2 rounded bg-[#161927] border border-[#2d3246] space-y-1.5 my-1">
+                    <div className="text-[10px] text-[#94a3b8] leading-tight">
+                      Syllabi are currently saved locally. Sign in to sync across devices:
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        onOpenAuthModal('login');
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono font-semibold bg-[#6366f1] hover:bg-[#4f46e5] text-white cursor-pointer transition-colors shadow-sm"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Sign In to Cloud Sync</span>
+                    </button>
+                  </div>
                 )}
 
                 {isAuthenticated && onLogout && (
