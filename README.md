@@ -131,7 +131,7 @@ The backend exposes a standard PocketBase REST API on port `3000`:
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/syllabex.git
+git clone https://github.com/shivanchowdhry123/syllabex.git
 cd syllabex
 
 # Install project dependencies
