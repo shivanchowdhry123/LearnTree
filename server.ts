@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -59,46 +60,9 @@ interface DBStore {
   }>;
 }
 
-// Initial seed data
+// Initial seed data - starts clean with no pre-configured demo accounts
 const initialDB: DBStore = {
-  users: [
-    {
-      id: 'usr_alex',
-      email: 'alex@syllabex.dev',
-      passwordHash: 'demo1234',
-      name: 'Alex Chen',
-      focusArea: 'Distributed Systems & Compilers',
-      avatarColor: '#6366f1',
-      avatarInitials: 'AC',
-      daily_target_minutes: 30,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-    },
-    {
-      id: 'usr_elena',
-      email: 'elena@syllabex.dev',
-      passwordHash: 'demo1234',
-      name: 'Dr. Elena Rostova',
-      focusArea: 'Deep Learning & Neural Architectures',
-      avatarColor: '#10b981',
-      avatarInitials: 'ER',
-      daily_target_minutes: 25,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-    },
-    {
-      id: 'usr_marcus',
-      email: 'marcus@syllabex.dev',
-      passwordHash: 'demo1234',
-      name: 'Marcus Vance',
-      focusArea: 'Cloud Native & Linux Kernel',
-      avatarColor: '#06b6d4',
-      avatarInitials: 'MV',
-      daily_target_minutes: 45,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-    },
-  ],
+  users: [],
   repositories: [],
   study_logs: [],
 };
@@ -141,9 +105,24 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// Helper for generating tokens
+// Helper for generating standard PocketBase-compatible JWT tokens
 function generateToken(userId: string): string {
-  return `pb_jwt_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  // Token valid for 30 days
+  const exp = Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
+  const payload = Buffer.from(
+    JSON.stringify({
+      id: userId,
+      type: 'authRecord',
+      collectionId: '_pb_users_auth_',
+      exp,
+    })
+  ).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', 'syllabex_production_secret_key_2026')
+    .update(`${header}.${payload}`)
+    .digest('base64url');
+  return `${header}.${payload}.${signature}`;
 }
 
 // ----------------------------------------------------
@@ -251,6 +230,30 @@ app.patch('/api/collections/users/records/:id', (req: Request, res: Response) =>
   const safe = { ...user };
   delete (safe as any).passwordHash;
   return res.json(safe);
+});
+
+// DELETE /api/collections/users/records/:id (Permanently delete user account and cloud data)
+app.delete('/api/collections/users/records/:id', (req: Request, res: Response) => {
+  const userId = req.params.id;
+  const userIndex = db.users.findIndex((u) => u.id === userId);
+  if (userIndex === -1) {
+    return res.status(404).json({ code: 404, message: 'User not found in database' });
+  }
+
+  // 1. Permanently remove the user from database
+  const deletedUser = db.users.splice(userIndex, 1)[0];
+
+  // 2. Cascade delete all repositories created by this user
+  db.repositories = db.repositories.filter((r) => r.user !== userId);
+
+  // 3. Cascade delete all study logs
+  db.study_logs = db.study_logs.filter((s) => s.user !== userId);
+
+  // 4. Save changes to persistent store (.data/pocketbase_store.json)
+  saveDB(db);
+
+  console.log(`[AUTH] Permanently deleted account ${deletedUser.email} (${userId}) from database.`);
+  return res.status(204).send();
 });
 
 // ----------------------------------------------------

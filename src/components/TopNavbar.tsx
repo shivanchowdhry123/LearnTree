@@ -14,6 +14,7 @@ import {
   LogIn,
   LogOut,
   Globe,
+  HelpCircle,
 } from 'lucide-react';
 import type { UserProfile } from '../types/user';
 import type { SyllabusRepo } from '../types/repo';
@@ -36,6 +37,7 @@ interface TopNavbarProps {
   onToggleSidebar: () => void;
   onOpenAuthModal?: (mode: 'login' | 'register') => void;
   onOpenShareModal?: () => void;
+  onOpenWalkthrough?: () => void;
   onLogout?: () => void;
   isAuthenticated?: boolean;
 }
@@ -57,6 +59,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   onOpenAuthModal,
   onOpenShareModal,
+  onOpenWalkthrough,
   onLogout,
   isAuthenticated = false,
 }) => {
@@ -190,17 +193,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </kbd>
         </button>
 
-        {/* Quick Sign In / Cloud Sync button if not logged in */}
-        {!isAuthenticated && onOpenAuthModal && (
+        {/* Walkthrough / Guide Button */}
+        {onOpenWalkthrough && (
           <button
             type="button"
-            onClick={() => onOpenAuthModal('login')}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#6366f1]/15 hover:bg-[#6366f1]/25 text-[#a5b4fc] hover:text-white border border-[#6366f1]/40 hover:border-[#6366f1] text-xs font-mono font-medium transition-all cursor-pointer shadow-sm shrink-0"
-            title="Connect to PocketBase cloud account to sync syllabi across devices"
+            onClick={onOpenWalkthrough}
+            className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-[#181b26] hover:bg-[#202433] text-[#38bdf8] border border-[#2d3246] hover:border-[#38bdf8]/60 transition-colors cursor-pointer text-xs font-mono font-medium shadow-sm shrink-0"
+            title="Syllabex Interactive Tour & Walkthrough"
           >
-            <LogIn className="w-3.5 h-3.5 text-[#818cf8]" />
-            <span className="hidden sm:inline">Cloud Sync</span>
-            <span className="hidden lg:inline text-[10px] text-[#818cf8] font-normal">• Sign In</span>
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Tour</span>
           </button>
         )}
 
@@ -209,16 +211,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <button
             type="button"
             onClick={() => setIsProfileOpen((p) => !p)}
-            className={`flex items-center gap-1.5 sm:gap-2 p-1 pl-1.5 pr-2 rounded-full bg-[#141722] border transition-all cursor-pointer shadow-sm ${
-              isAuthenticated
-                ? 'border-[#10b981]/50 hover:border-[#10b981]'
-                : 'border-[#2d3246] hover:border-[#f59e0b]/50'
-            }`}
-            title={
-              isAuthenticated
-                ? `Cloud Account: ${activeUser.name} (${activeUser.email || 'Synced'})`
-                : `Local Guest Workspace: ${activeUser.name} (Offline / Demo Mode)`
-            }
+            className="flex items-center gap-1.5 sm:gap-2 p-1 pl-1.5 pr-2.5 rounded-full bg-[#141722] border border-[#2d3246] hover:border-[#6366f1]/60 transition-all cursor-pointer shadow-sm"
+            title={`Account: ${activeUser.name} (${activeUser.email || 'Cloud Synced'})`}
           >
             <div className="relative">
               <div
@@ -227,28 +221,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               >
                 {activeUser.avatarInitials}
               </div>
-              {/* Online / local indicator dot */}
-              <span
-                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#141722] ${
-                  isAuthenticated ? 'bg-[#10b981]' : 'bg-[#f59e0b]'
-                }`}
-              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#141722] bg-[#10b981]" />
             </div>
 
-            <span className="text-xs font-medium text-[#f1f5f9] max-w-[80px] truncate hidden md:inline">
+            <span className="text-xs font-medium text-[#f1f5f9] max-w-[100px] truncate hidden md:inline">
               {activeUser.name}
             </span>
 
-            {/* Clear Mode Badge: Demo if local offline, Cloud if authenticated */}
-            {!isAuthenticated ? (
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase bg-[#f59e0b]/15 text-[#f59e0b] border border-[#f59e0b]/30">
-                Demo
-              </span>
-            ) : (
-              <span className="hidden xl:inline px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
-                Cloud
-              </span>
-            )}
+            <span className="hidden xl:inline px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold uppercase bg-[#6366f1]/15 text-[#a5b4fc] border border-[#6366f1]/30">
+              Synced
+            </span>
           </button>
 
           {isProfileOpen && (
@@ -257,20 +239,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-[#f1f5f9] truncate flex items-center gap-1.5">
                     <span>{activeUser.name}</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase ${
-                        isAuthenticated
-                          ? 'bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30'
-                          : 'bg-[#f59e0b]/15 text-[#f59e0b] border border-[#f59e0b]/30'
-                      }`}
-                    >
-                      {isAuthenticated ? 'Cloud Account' : 'Demo Workspace'}
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold uppercase bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
+                      Cloud Account
                     </span>
                   </div>
-                  <div className="text-[10px] font-mono text-[#94a3b8] truncate">
-                    {isAuthenticated
-                      ? activeUser.email || 'PocketBase Cloud Synchronized'
-                      : 'Local storage only • Not synced to cloud'}
+                  <div className="text-[10px] font-mono text-[#94a3b8] truncate mt-0.5">
+                    {activeUser.email || 'Active Cloud Profile'}
+                  </div>
+                  <div className="text-[10px] text-[#64748b] truncate mt-0.5">
+                    Focus: {activeUser.focusArea}
                   </div>
                 </div>
                 <button
@@ -286,41 +263,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 </button>
               </div>
 
-              {/* Profiles list */}
-              <div className="p-1 space-y-0.5 max-h-48 overflow-y-auto">
-                <div className="px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-[#475569]">
-                  Switch Account
-                </div>
-                {users.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectUser(u.id);
-                      setIsProfileOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs transition-colors cursor-pointer ${
-                      u.id === activeUser.id
-                        ? 'bg-[#1b1f2e] text-[#f1f5f9] font-medium'
-                        : 'text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#181b26]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: u.avatarColor }}
-                      />
-                      <span className="truncate">{u.name}</span>
-                    </div>
-                    {u.id === activeUser.id && (
-                      <Check className="w-3.5 h-3.5 text-[#10b981]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Footer Actions */}
-              <div className="p-1.5 border-t border-[#1e2230] space-y-1 bg-[#12141c]">
+              {/* Actions List */}
+              <div className="p-1.5 space-y-1 bg-[#12141c]">
                 {activeRepo && onOpenShareModal && (
                   <button
                     type="button"
@@ -328,43 +272,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                       setIsProfileOpen(false);
                       onOpenShareModal();
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer"
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-xs font-mono text-[#06b6d4] hover:bg-[#181b26] cursor-pointer transition-colors"
                   >
                     <Share2 className="w-3.5 h-3.5 text-[#06b6d4]" />
                     <span>Share Active Syllabus</span>
-                  </button>
-                )}
-
-                {!isAuthenticated && onOpenAuthModal && (
-                  <div className="p-2 rounded bg-[#161927] border border-[#2d3246] space-y-1.5 my-1">
-                    <div className="text-[10px] text-[#94a3b8] leading-tight">
-                      Syllabi are currently saved locally. Sign in to sync across devices:
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProfileOpen(false);
-                        onOpenAuthModal('login');
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono font-semibold bg-[#6366f1] hover:bg-[#4f46e5] text-white cursor-pointer transition-colors shadow-sm"
-                    >
-                      <LogIn className="w-3.5 h-3.5" />
-                      <span>Sign In to Cloud Sync</span>
-                    </button>
-                  </div>
-                )}
-
-                {isAuthenticated && onLogout && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      onLogout();
-                    }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#ef4444] hover:bg-[#181b26] cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-[#ef4444]" />
-                    <span>Sign Out</span>
                   </button>
                 )}
 
@@ -374,23 +285,39 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                     setIsProfileOpen(false);
                     onOpenProfileSettings();
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#f1f5f9] hover:bg-[#181b26] cursor-pointer"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-xs font-mono text-[#f1f5f9] hover:bg-[#181b26] cursor-pointer transition-colors"
                 >
                   <Settings className="w-3.5 h-3.5 text-[#94a3b8]" />
                   <span>Profile Settings & Backup</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileOpen(false);
-                    onOpenCreateUser();
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs font-mono text-[#94a3b8] hover:bg-[#181b26] cursor-pointer"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>+ Add Demo Profile</span>
-                </button>
+                {onOpenWalkthrough && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onOpenWalkthrough();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-xs font-mono text-[#38bdf8] hover:bg-[#181b26] cursor-pointer transition-colors"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-[#38bdf8]" />
+                    <span>Interactive Tour & Guide</span>
+                  </button>
+                )}
+
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded text-xs font-mono text-[#ef4444] hover:bg-[#ef4444]/10 cursor-pointer transition-colors border-t border-[#1e2230] mt-1 pt-2"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-[#ef4444]" />
+                    <span>Log Out</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

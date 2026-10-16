@@ -52,7 +52,7 @@ import {
   loadUserTodayStudyMinutes,
   saveUserTodayStudyMinutes,
   addStudyMinutes,
-  INITIAL_USER_PROFILES,
+  getInitialUserRepos,
 } from './lib/userStore';
 import { flattenTree, exportToMarkdown } from './lib/parser';
 import { calculateNextReview, createInitialSM2State } from './lib/sm2';
@@ -68,29 +68,44 @@ import { SettingsModal } from './components/SettingsModal';
 import { SyllabusTreeGraph } from './components/SyllabusTreeGraph';
 import { DailyGoalModal } from './components/DailyGoalModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthPage } from './components/AuthPage';
 import { ShareModal } from './components/ShareModal';
+import { WalkthroughModal } from './components/WalkthroughModal';
+import { EmptyWorkspace } from './components/EmptyWorkspace';
 import { syncEngine } from './lib/syncEngine';
 import {
   pb,
   getSavedSessionUser,
   logoutUser,
+  deleteUserAccount,
   fetchRemoteUserRepos,
   fetchPublicSyllabus,
   pushRepoToRemote,
 } from './lib/pocketbase';
 
 export default function App() {
-  // Multi-user state
-  const [users, setUsers] = useState<UserProfile[]>(() => loadUserProfiles());
-  const [activeUserId, setActiveUserIdState] = useState<string>(() => getActiveUserId());
+  // Session & Authentication State - Real profiles only, persistent across reloads
+  const initialSessionUser = useMemo(() => getSavedSessionUser(), []);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => initialSessionUser);
+  const [activeUserIdState, setActiveUserIdState] = useState<string>(() => initialSessionUser?.id || '');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    () => Boolean(initialSessionUser)
+  );
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(false);
 
-  const activeUser = useMemo(() => {
-    return (
-      users.find((u) => u.id === activeUserId) ||
-      users[0] ||
-      INITIAL_USER_PROFILES[0]
-    );
-  }, [users, activeUserId]);
+  const activeUser: UserProfile = useMemo(() => {
+    if (currentUser) return currentUser;
+    return {
+      id: activeUserIdState || '',
+      name: 'Student',
+      avatarColor: '#6366f1',
+      avatarInitials: 'ST',
+      focusArea: 'Software Engineering',
+      createdAt: new Date().toISOString(),
+    };
+  }, [currentUser, activeUserIdState]);
+
+  const activeUserId = currentUser?.id || activeUserIdState;
 
   // Per-user syllabus repos state (Google Drive model)
   const [repos, setRepos] = useState<SyllabusRepo[]>(() =>
@@ -127,8 +142,7 @@ export default function App() {
   const [isRetentionModalOpen, setIsRetentionModalOpen] = useState<boolean>(false);
   const [isDailyGoalModalOpen, setIsDailyGoalModalOpen] = useState<boolean>(false);
 
-  // Multi-user & Cloud Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => pb.authStore.isValid);
+  // Cloud Authentication Modals
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
@@ -271,14 +285,11 @@ export default function App() {
 
   // Auth & Cloud Sync Lifecycle
   useEffect(() => {
-    // 1. Check existing session
+    // 1. Check existing session (persistent across page reloads)
     const savedUser = getSavedSessionUser();
-    if (savedUser && pb.authStore.isValid) {
+    if (savedUser) {
       setIsAuthenticated(true);
-      setUsers((prev) => {
-        const filtered = prev.filter((u) => u.id !== savedUser.id);
-        return [savedUser, ...filtered];
-      });
+      setCurrentUser(savedUser);
       setActiveUserIdState(savedUser.id);
       setActiveUserId(savedUser.id);
 
@@ -321,17 +332,14 @@ export default function App() {
     return () => unsub();
   }, [showToast]);
 
-  // Auth Success Handler
+  // Auth Success Handler - real accounts only, starting from 0 for brand new users
   const handleAuthSuccess = useCallback((user: UserProfile) => {
     setIsAuthenticated(true);
-    setUsers((prev) => {
-      const filtered = prev.filter((u) => u.id !== user.id);
-      return [user, ...filtered];
-    });
+    setCurrentUser(user);
     setActiveUserIdState(user.id);
     setActiveUserId(user.id);
 
-    // Fetch or migrate user repos
+    // Fetch user repos from PocketBase cloud
     fetchRemoteUserRepos(user.id).then((remoteRepos) => {
       if (remoteRepos && remoteRepos.length > 0) {
         setRepos(remoteRepos);
@@ -339,28 +347,30 @@ export default function App() {
         setActiveRepoIdState(remoteRepos[0].id);
         showToast(`Signed in as ${user.name}. Loaded ${remoteRepos.length} syllabi.`);
       } else {
-        // Push existing local repos to PocketBase cloud account
-        const localRepos = loadUserRepos(activeUserId);
-        const userMigratedRepos = localRepos.map((r) => ({
-          ...r,
-          userId: user.id,
-          id: `repo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        }));
-        setRepos(userMigratedRepos);
-        saveUserRepos(user.id, userMigratedRepos);
-        userMigratedRepos.forEach((r) => syncEngine.enqueueRepoMutation(r));
-        showToast(`Welcome ${user.name}! Cloud sync active.`);
+        // Starts completely from 0: empty repos list
+        setRepos([]);
+        saveUserRepos(user.id, []);
+        setActiveRepoIdState('');
+        showToast(`Welcome ${user.name}! Workspace initialized.`);
+        // Show walkthrough if not yet seen
+        const seen = localStorage.getItem(`syllabex_walkthrough_seen_${user.id}`);
+        if (!seen) {
+          setIsWalkthroughOpen(true);
+        }
       }
     });
-  }, [activeUserId, showToast]);
+  }, [showToast]);
 
-  // Logout Handler
+  // Logout Handler - completely clears session and shows AuthPage
   const handleLogout = useCallback(() => {
     logoutUser();
     setIsAuthenticated(false);
-    handleSwitchUser(INITIAL_USER_PROFILES[0].id);
-    showToast('Signed out. Switched to demo mode.');
-  }, [handleSwitchUser, showToast]);
+    setCurrentUser(null);
+    setActiveUserIdState('');
+    setActiveUserId('');
+    setRepos([]);
+    showToast('Signed out of Syllabex.');
+  }, [showToast]);
 
   // Fork / Clone Public Syllabus Handler
   const handleClonePublicSyllabus = useCallback(() => {
@@ -448,27 +458,41 @@ export default function App() {
     (userId: string, updates: Partial<Pick<UserProfile, 'name' | 'avatarColor'>>) => {
       const updated = updateUserProfile(userId, updates);
       if (updated) {
-        setUsers(loadUserProfiles());
+        setCurrentUser(updated);
+        // Sync to remote PocketBase account asynchronously
+        pb.collection('users')
+          .update(userId, {
+            name: updated.name,
+            avatarColor: updated.avatarColor,
+            avatarInitials: updated.avatarInitials,
+          })
+          .catch((err) => console.warn('Failed to update remote user profile:', err));
         showToast('Profile updated successfully');
       }
     },
     [showToast]
   );
 
-  // Delete User Profile
-  const handleDeleteUser = useCallback((userId: string) => {
-    const { remainingUsers, nextActiveId } = deleteUserProfile(userId);
-    setUsers(remainingUsers);
-    handleSwitchUser(nextActiveId);
-    showToast('Profile deleted');
-  }, [handleSwitchUser, showToast]);
+  // Delete User Profile permanently from database and clear local session
+  const handleDeleteUser = useCallback(
+    async (userId: string) => {
+      try {
+        await deleteUserAccount(userId);
+      } catch (err) {
+        console.error('Failed to permanently delete user account on server:', err);
+      }
+      deleteUserProfile(userId);
+      handleLogout();
+      showToast('Account and all syllabi permanently deleted from database.');
+    },
+    [handleLogout, showToast]
+  );
 
-  // Create New User Profile
+  // Create New User Profile (via modal if used)
   const handleCreateUser = useCallback(
     (name: string, focusArea: string, color: string) => {
       const newProfile = createUserProfile(name, focusArea, color);
-      const updatedList = loadUserProfiles();
-      setUsers(updatedList);
+      setCurrentUser(newProfile);
       handleSwitchUser(newProfile.id);
       setIsCreateUserOpen(false);
       showToast(`Welcome ${name}! Profile created.`);
@@ -476,13 +500,19 @@ export default function App() {
     [handleSwitchUser, showToast]
   );
 
-  // Reset to Factory Starter Data
+  // Reset Active User Workspace Data to clean slate (0)
   const handleResetFactoryData = useCallback(() => {
-    localStorage.clear();
-    setUsers(INITIAL_USER_PROFILES);
-    handleSwitchUser(INITIAL_USER_PROFILES[0].id);
-    showToast('Reset all database records to starter demo state.');
-  }, [handleSwitchUser, showToast]);
+    if (activeUserId) {
+      localStorage.removeItem(`learntree_user_${activeUserId}_repos`);
+      localStorage.removeItem(`learntree_user_${activeUserId}_active_repo`);
+      localStorage.removeItem(`learntree_user_${activeUserId}_streak`);
+      localStorage.removeItem(`learntree_user_${activeUserId}_last_date`);
+    }
+    setRepos([]);
+    saveUserRepos(activeUserId, []);
+    setActiveRepoIdState('');
+    showToast('Workspace reset to clean slate (0 syllabi).');
+  }, [activeUserId, showToast]);
 
   // Current Nodes (from activeRepo)
   const nodes = useMemo(() => {
@@ -878,6 +908,21 @@ export default function App() {
       ? Math.round((metrics.completedNodes / metrics.totalNodes) * 100)
       : 0;
 
+  // If user is not authenticated, render dedicated AuthPage (no demo bypass)
+  if (!isAuthenticated || !currentUser) {
+    return (
+      <>
+        {toastMessage && (
+          <div className="fixed top-3 right-4 z-50 flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#141722] border border-[#10b981] shadow-[0_8px_24px_rgba(16,185,129,0.25)] text-xs font-mono text-[#f1f5f9] animate-in fade-in slide-in-from-top-2 duration-150">
+            <Check className="w-3.5 h-3.5 text-[#10b981]" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+        <AuthPage onAuthSuccess={handleAuthSuccess} />
+      </>
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-[#090a0f] text-[#f1f5f9] overflow-hidden font-sans select-none antialiased">
       {/* Toast Notification Banner */}
@@ -888,11 +933,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Navigation Bar with activeRepo breadcrumb, search, triggers, and profile switcher */}
+      {/* Top Navigation Bar with activeRepo breadcrumb, search, triggers, and profile actions */}
       <TopNavbar
         activeUser={activeUser}
         activeRepo={activeRepo}
-        users={users}
+        users={currentUser ? [currentUser] : []}
         onSelectUser={handleSwitchUser}
         onOpenCreateUser={() => setIsCreateUserOpen(true)}
         onOpenProfileSettings={() => setIsProfileSettingsOpen(true)}
@@ -912,6 +957,7 @@ export default function App() {
           setShareTargetRepo(activeRepo);
           setIsShareModalOpen(true);
         }}
+        onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
         onLogout={handleLogout}
         isAuthenticated={isAuthenticated}
       />
@@ -1003,8 +1049,24 @@ export default function App() {
 
         {/* Center / Right Workbench Reading Channel */}
         <main className="flex-1 overflow-y-auto bg-[#090a0f] p-4 sm:p-6 space-y-4 relative">
-          <div className="max-w-6xl mx-auto space-y-4 pb-20">
-            {/* Hero Syllabus & 5 KPI Cards (Screen 1) */}
+          {repos.length === 0 ? (
+            <EmptyWorkspace
+              userName={activeUser.name}
+              onOpenCreateRepo={() => setIsCreateRepoOpen(true)}
+              onOpenImport={() => setIsImportOpen(true)}
+              onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
+              onImportExample={(name, code, markdown) => {
+                const newRepo = createUserRepo(activeUserId, name, code, markdown);
+                setRepos([newRepo]);
+                saveUserRepos(activeUserId, [newRepo]);
+                setActiveRepoIdState(newRepo.id);
+                syncEngine.enqueueRepoMutation(newRepo);
+                showToast(`Imported "${name}" syllabus!`);
+              }}
+            />
+          ) : (
+            <div className="max-w-6xl mx-auto space-y-4 pb-20">
+              {/* Hero Syllabus & 5 KPI Cards (Screen 1) */}
             <DashboardHeader
               metrics={metrics}
               activeUser={activeUser}
@@ -1283,6 +1345,7 @@ export default function App() {
               />
             )}
           </div>
+          )}
 
           {/* Bottom Floating Banner: Queue Ready (Screen 1 bottom) */}
           {metrics.dueForReviewCount > 0 && (
@@ -1359,7 +1422,7 @@ export default function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         totalRepos={repos.length}
         totalNodes={flatNodes.length}
-        totalUsers={users.length}
+        totalUsers={currentUser ? 1 : 0}
         onResetFactoryData={handleResetFactoryData}
       />
 
@@ -1649,6 +1712,15 @@ export default function App() {
             }
           });
         }}
+      />
+
+      {/* Onboarding & Walkthrough Modal for New Accounts */}
+      <WalkthroughModal
+        isOpen={isWalkthroughOpen}
+        onClose={() => setIsWalkthroughOpen(false)}
+        onOpenCreateRepo={() => setIsCreateRepoOpen(true)}
+        onOpenImport={() => setIsImportOpen(true)}
+        userId={activeUserId}
       />
     </div>
   );

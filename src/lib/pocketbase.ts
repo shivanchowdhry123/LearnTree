@@ -50,39 +50,69 @@ export function formatUserProfile(record: any, token?: string): UserProfile {
     createdAt: record.created || new Date().toISOString(),
     dailyTargetMinutes: record.daily_target_minutes || 30,
     token: token || pb.authStore.token,
-    isDemo: false,
   };
 }
 
 /**
- * Checks if a session is currently stored and valid
+ * Checks if an authenticated session is currently stored and valid
  */
 export function getSavedSessionUser(): UserProfile | null {
   if (typeof window === 'undefined') return null;
-  if (!pb.authStore.isValid || !pb.authStore.record) {
-    // Check fallback localStorage for demo profiles
-    try {
-      const localActiveId = localStorage.getItem('learntree_active_user_id');
-      const localUsers = JSON.parse(localStorage.getItem('learntree_user_profiles') || '[]');
-      const found = localUsers.find((u: UserProfile) => u.id === localActiveId);
-      if (found) {
-        return { ...found, isDemo: true };
-      }
-    } catch {
-      // ignore
-    }
-    return null;
+
+  // 1. Direct PocketBase authStore check
+  if (pb.authStore.record) {
+    return formatUserProfile(pb.authStore.record, pb.authStore.token);
   }
 
-  return formatUserProfile(pb.authStore.record, pb.authStore.token);
+  // 2. PocketBase default localStorage check ('pocketbase_auth')
+  try {
+    const rawPb = localStorage.getItem('pocketbase_auth');
+    if (rawPb) {
+      const parsed = JSON.parse(rawPb);
+      if (parsed?.token && parsed?.record) {
+        pb.authStore.save(parsed.token, parsed.record);
+        if (pb.authStore.record) {
+          return formatUserProfile(pb.authStore.record, parsed.token);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // 3. Syllabex cached session user
+  try {
+    const cached = localStorage.getItem('syllabex_active_session_user');
+    if (cached) {
+      const user = JSON.parse(cached);
+      if (user && user.id) {
+        return user;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
 /**
  * Log in with Email and Password via PocketBase
  */
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
-  const authData = await pb.collection('users').authWithPassword(email, password);
-  return formatUserProfile(authData.record, authData.token);
+  const authData = await pb.collection('users').authWithPassword(email.trim(), password);
+  const profile = formatUserProfile(authData.record, authData.token);
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('syllabex_active_session_user', JSON.stringify(profile));
+      localStorage.setItem('learntree_active_user', profile.id);
+    } catch {
+      // ignore
+    }
+  }
+
+  return profile;
 }
 
 /**
@@ -105,11 +135,11 @@ export async function registerWithEmail(
 
   // 1. Create record
   await pb.collection('users').create({
-    email,
+    email: email.trim().toLowerCase(),
     password,
     passwordConfirm: password,
-    name,
-    focusArea,
+    name: name.trim(),
+    focusArea: focusArea.trim(),
     avatarColor,
     avatarInitials: initials,
     daily_target_minutes: 30,
@@ -124,6 +154,44 @@ export async function registerWithEmail(
  */
 export function logoutUser(): void {
   pb.authStore.clear();
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('pocketbase_auth');
+      localStorage.removeItem('syllabex_active_session_user');
+      localStorage.removeItem('learntree_active_user');
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Permanently delete user account and all cloud syllabi from the database
+ */
+export async function deleteUserAccount(userId: string): Promise<boolean> {
+  try {
+    await pb.collection('users').delete(userId);
+  } catch (err) {
+    console.warn('pb.collection delete failed, attempting direct fetch:', err);
+    try {
+      const resp = await fetch(`/api/collections/users/records/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+        },
+      });
+      if (!resp.ok && resp.status !== 404) {
+        throw new Error(`Failed to delete user: ${resp.statusText}`);
+      }
+    } catch (fetchErr) {
+      console.error('Account deletion on server failed:', fetchErr);
+      return false;
+    }
+  }
+
+  logoutUser();
+  return true;
 }
 
 /**

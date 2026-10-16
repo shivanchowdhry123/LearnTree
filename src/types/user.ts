@@ -7,6 +7,5 @@ export interface UserProfile {
   focusArea: string;
   createdAt: string;
   token?: string;
-  isDemo?: boolean;
   dailyTargetMinutes?: number;
 }

@@ -6,35 +6,7 @@ import { parseSyllabusText } from './parser';
 const STORAGE_KEY_USERS = 'learntree_multi_users';
 const STORAGE_KEY_ACTIVE_USER = 'learntree_active_user_id';
 
-export const INITIAL_USER_PROFILES: UserProfile[] = [
-  {
-    id: 'user_alex',
-    name: 'Alex Rivers',
-    avatarColor: '#10b981',
-    avatarInitials: 'AR',
-    focusArea: 'Distributed Systems & Cloud',
-    createdAt: '2026-09-15T08:00:00.000Z',
-    isDemo: true,
-  },
-  {
-    id: 'user_elena',
-    name: 'Elena Rostova',
-    avatarColor: '#06b6d4',
-    avatarInitials: 'ER',
-    focusArea: 'Full-Stack & React 19',
-    createdAt: '2026-09-20T10:30:00.000Z',
-    isDemo: true,
-  },
-  {
-    id: 'user_marcus',
-    name: 'Marcus Chen',
-    avatarColor: '#6366f1',
-    avatarInitials: 'MC',
-    focusArea: 'Systems & Compilers',
-    createdAt: '2026-09-28T14:15:00.000Z',
-    isDemo: true,
-  },
-];
+export const INITIAL_USER_PROFILES: UserProfile[] = [];
 
 // Sample Curricula Outlines for Repositories
 const OUTLINE_DISTRIBUTED_SYSTEMS = `# Distributed Systems & Concurrency
@@ -141,43 +113,27 @@ function buildSeededRepo(
   };
 }
 
-function getInitialUserRepos(userId: string): SyllabusRepo[] {
-  if (userId === 'user_alex') {
-    return [
-      buildSeededRepo(userId, 'repo_alex_sys', 'Distributed Systems & Concurrency', 'SYS-601', OUTLINE_DISTRIBUTED_SYSTEMS),
-      buildSeededRepo(userId, 'repo_alex_comp', 'Compilers & AST Optimization', 'CS-530', OUTLINE_COMPILERS),
-      buildSeededRepo(userId, 'repo_alex_kern', 'Linux Kernel & eBPF', 'OS-610', OUTLINE_KERNEL),
-      buildSeededRepo(userId, 'repo_alex_rust', 'Rust Concurrency & Atomics', 'SYS-720', OUTLINE_RUST),
-    ];
-  } else if (userId === 'user_elena') {
-    return [
-      buildSeededRepo(userId, 'repo_elena_web', 'Modern Web & React 19', 'CS-142', OUTLINE_WEB_REACT),
-      buildSeededRepo(userId, 'repo_elena_db', 'Database Internals & Storage', 'DB-301', OUTLINE_DATABASES),
-    ];
-  } else {
-    return [
-      buildSeededRepo(userId, 'repo_marcus_comp', 'Compilers & AST Optimization', 'CS-530', OUTLINE_COMPILERS),
-      buildSeededRepo(userId, 'repo_marcus_rust', 'Rust Concurrency & Atomics', 'SYS-720', OUTLINE_RUST),
-    ];
-  }
+// For brand new accounts: everything starts completely from 0 (no pre-defined or half-completed syllabus)
+export function getInitialUserRepos(_userId: string): SyllabusRepo[] {
+  return [];
 }
+
 
 // User Profile Operations
 export function loadUserProfiles(): UserProfile[] {
-  if (typeof window === 'undefined') return INITIAL_USER_PROFILES;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_USERS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Failed to load user profiles:', err);
   }
-  saveUserProfiles(INITIAL_USER_PROFILES);
-  return INITIAL_USER_PROFILES;
+  return [];
 }
 
 export function saveUserProfiles(users: UserProfile[]): void {
@@ -190,14 +146,15 @@ export function saveUserProfiles(users: UserProfile[]): void {
 }
 
 export function getActiveUserId(): string {
-  if (typeof window === 'undefined') return INITIAL_USER_PROFILES[0].id;
+  if (typeof window === 'undefined') return '';
   try {
     const active = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
     if (active) return active;
   } catch {
     // fallback
   }
-  return INITIAL_USER_PROFILES[0].id;
+  const users = loadUserProfiles();
+  return users[0]?.id || '';
 }
 
 export function setActiveUserId(id: string): void {
@@ -236,23 +193,11 @@ export function createUserProfile(
   const updated = [...users, newProfile];
   saveUserProfiles(updated);
 
-  // Initialize a starter repo for the new user
-  const initialRepo = buildSeededRepo(
-    id,
-    `repo_${id}_default`,
-    newProfile.focusArea,
-    'CURR-101',
-    `# ${newProfile.focusArea}
-- [ ] Core Fundamental Principles #fundamentals
-  - [ ] Primary Invariants & Axioms
-  - [ ] Operational Edge Cases
-- Advanced Topics & Practical Application #advanced
-  - [ ] System Evaluation & Trade-Offs`
-  );
-
-  saveUserRepos(id, [initialRepo]);
-  setActiveRepoId(id, initialRepo.id);
-  saveUserStreak(id, 1);
+  // Brand new account starts completely from 0: empty repos, 0 streak, 0 study minutes
+  saveUserRepos(id, []);
+  setActiveRepoId(id, '');
+  saveUserStreak(id, 0);
+  saveUserTodayStudyMinutes(id, 0);
 
   return newProfile;
 }
@@ -303,10 +248,9 @@ export function deleteUserProfile(userId: string): { remainingUsers: UserProfile
   }
 
   if (filtered.length === 0) {
-    // If last user was deleted, reset to initial default
-    saveUserProfiles(INITIAL_USER_PROFILES);
-    setActiveUserId(INITIAL_USER_PROFILES[0].id);
-    return { remainingUsers: INITIAL_USER_PROFILES, nextActiveId: INITIAL_USER_PROFILES[0].id };
+    saveUserProfiles([]);
+    setActiveUserId('');
+    return { remainingUsers: [], nextActiveId: '' };
   }
 
   saveUserProfiles(filtered);
@@ -317,13 +261,13 @@ export function deleteUserProfile(userId: string): { remainingUsers: UserProfile
 
 // User-Specific Syllabus Repositories (Google Drive Model)
 export function loadUserRepos(userId: string): SyllabusRepo[] {
-  if (typeof window === 'undefined') return getInitialUserRepos(userId);
+  if (typeof window === 'undefined' || !userId) return [];
   const key = `learntree_user_${userId}_repos`;
   try {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -331,9 +275,8 @@ export function loadUserRepos(userId: string): SyllabusRepo[] {
     console.error(`Failed to load repos for user ${userId}:`, err);
   }
 
-  const initial = getInitialUserRepos(userId);
-  saveUserRepos(userId, initial);
-  return initial;
+  // Brand new users start completely from 0
+  return [];
 }
 
 export function saveUserRepos(userId: string, repos: SyllabusRepo[]): void {
@@ -432,10 +375,9 @@ export function deleteUserRepo(userId: string, repoId: string): { remainingRepos
   const repos = loadUserRepos(userId);
   const filtered = repos.filter((r) => r.id !== repoId);
   if (filtered.length === 0) {
-    const defaultRepo = buildSeededRepo(userId, `repo_${Date.now()}`, 'General Curriculum', 'GEN-101', '# General Curriculum\n- [ ] Getting Started');
-    saveUserRepos(userId, [defaultRepo]);
-    setActiveRepoId(userId, defaultRepo.id);
-    return { remainingRepos: [defaultRepo], nextActiveId: defaultRepo.id };
+    saveUserRepos(userId, []);
+    setActiveRepoId(userId, '');
+    return { remainingRepos: [], nextActiveId: '' };
   }
   saveUserRepos(userId, filtered);
   const nextActiveId = filtered[0].id;
@@ -445,35 +387,32 @@ export function deleteUserRepo(userId: string, repoId: string): { remainingRepos
 
 // User Streak & Last Study Date
 export function loadUserStreak(userId: string): number {
-  if (typeof window === 'undefined') return 3;
+  if (typeof window === 'undefined' || !userId) return 0;
   const key = `learntree_user_${userId}_streak`;
   try {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = parseInt(raw, 10);
-      if (!isNaN(parsed)) return parsed;
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {
     // fallback
   }
-  if (userId === 'user_alex') return 19;
-  if (userId === 'user_elena') return 7;
-  if (userId === 'user_marcus') return 12;
-  return 3;
+  return 0;
 }
 
 export function saveUserStreak(userId: string, streak: number): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !userId) return;
   const key = `learntree_user_${userId}_streak`;
   try {
-    localStorage.setItem(key, streak.toString());
+    localStorage.setItem(key, Math.max(0, streak).toString());
   } catch {
     // ignore
   }
 }
 
 export function loadUserLastStudyDate(userId: string): string | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || !userId) return null;
   const key = `learntree_user_${userId}_last_date`;
   try {
     return localStorage.getItem(key);
@@ -483,7 +422,7 @@ export function loadUserLastStudyDate(userId: string): string | null {
 }
 
 export function saveUserLastStudyDate(userId: string, dateStr: string): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !userId) return;
   const key = `learntree_user_${userId}_last_date`;
   try {
     localStorage.setItem(key, dateStr);
@@ -497,7 +436,7 @@ export function getTodayDateString(): string {
 }
 
 export function loadUserDailyTarget(userId: string): number {
-  if (typeof window === 'undefined') return 30;
+  if (typeof window === 'undefined' || !userId) return 30;
   const key = `learntree_user_${userId}_daily_target`;
   try {
     const raw = localStorage.getItem(key);
@@ -508,14 +447,11 @@ export function loadUserDailyTarget(userId: string): number {
   } catch {
     // fallback
   }
-  if (userId === 'user_alex') return 30;
-  if (userId === 'user_elena') return 25;
-  if (userId === 'user_marcus') return 45;
   return 30;
 }
 
 export function saveUserDailyTarget(userId: string, targetMinutes: number): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !userId) return;
   const key = `learntree_user_${userId}_daily_target`;
   try {
     localStorage.setItem(key, Math.max(1, targetMinutes).toString());
@@ -525,7 +461,7 @@ export function saveUserDailyTarget(userId: string, targetMinutes: number): void
 }
 
 export function loadUserTodayStudyMinutes(userId: string): number {
-  if (typeof window === 'undefined') return 18;
+  if (typeof window === 'undefined' || !userId) return 0;
   const todayStr = getTodayDateString();
   const key = `learntree_user_${userId}_study_minutes_${todayStr}`;
   try {
@@ -537,14 +473,11 @@ export function loadUserTodayStudyMinutes(userId: string): number {
   } catch {
     // fallback
   }
-  if (userId === 'user_alex') return 18;
-  if (userId === 'user_elena') return 25;
-  if (userId === 'user_marcus') return 30;
   return 0;
 }
 
 export function saveUserTodayStudyMinutes(userId: string, minutes: number): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !userId) return;
   const todayStr = getTodayDateString();
   const key = `learntree_user_${userId}_study_minutes_${todayStr}`;
   try {

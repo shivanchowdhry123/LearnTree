@@ -71,20 +71,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickDemoLogin = async (demoEmail: string, demoPass: string) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const user = await loginWithEmail(demoEmail, demoPass);
-      onAuthSuccess(user);
-      onClose();
-    } catch (err: any) {
-      setErrorMessage('Could not connect to demo account.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
       <div
@@ -225,20 +211,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </div>
 
-          {mode === 'register' && hasLocalDataToMigrate && (
-            <label className="flex items-center gap-2 p-2.5 rounded-lg bg-[#181b27] border border-[#282d3f] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={migrateLocalData}
-                onChange={(e) => setMigrateLocalData(e.target.checked)}
-                className="rounded border-[#2d3246] text-[#6366f1] focus:ring-0"
-              />
-              <span className="text-xs text-[#cbd5e1]">
-                Migrate existing demo syllabi & review progress into my new cloud account
-              </span>
-            </label>
-          )}
-
           <button
             type="submit"
             disabled={isLoading}
@@ -255,35 +227,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </form>
 
-        {/* Demo Fast Login Pills */}
-        <div className="p-4 border-t border-[#1e2230] bg-[#0c0e15] space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#94a3b8]">
-            <Database className="w-3 h-3 text-[#06b6d4]" />
-            <span>Instant Demo Accounts (Pre-configured)</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('alex@syllabex.dev', 'demo1234')}
-              className="px-2 py-1.5 rounded bg-[#161925] hover:bg-[#202434] border border-[#2d3246] hover:border-[#6366f1] text-[11px] font-medium text-[#f1f5f9] transition-colors truncate text-center"
-            >
-              Alex Chen
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('elena@syllabex.dev', 'demo1234')}
-              className="px-2 py-1.5 rounded bg-[#161925] hover:bg-[#202434] border border-[#2d3246] hover:border-[#10b981] text-[11px] font-medium text-[#f1f5f9] transition-colors truncate text-center"
-            >
-              Dr. Elena
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('marcus@syllabex.dev', 'demo1234')}
-              className="px-2 py-1.5 rounded bg-[#161925] hover:bg-[#202434] border border-[#2d3246] hover:border-[#06b6d4] text-[11px] font-medium text-[#f1f5f9] transition-colors truncate text-center"
-            >
-              Marcus V.
-            </button>
-          </div>
+        <div className="p-3 border-t border-[#1e2230] bg-[#0c0e15] flex items-center justify-between text-[11px] text-[#94a3b8] font-mono">
+          <span>{mode === 'login' ? "Don't have an account?" : 'Already registered?'}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'login' ? 'register' : 'login');
+              setErrorMessage(null);
+            }}
+            className="text-[#6366f1] hover:text-[#818cf8] font-medium transition-colors cursor-pointer"
+          >
+            {mode === 'login' ? 'Create one now' : 'Sign In'}
+          </button>
         </div>
       </div>
     </div>
